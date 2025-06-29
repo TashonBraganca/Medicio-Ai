@@ -1,5 +1,9 @@
 /node_modules
 /env
+.env
+*.env
+.env.*
+!.env.example
 /AI doctor/venv
 /analzer/venv
 /my-app/AI doctor/venv

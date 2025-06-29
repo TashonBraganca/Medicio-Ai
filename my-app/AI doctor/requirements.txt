@@ -3,10 +3,10 @@ fastapi==0.115.12
 python-dotenv==1.0.0
 uvicorn==0.24.0
 SpeechRecognition==3.10.0
-elevenlabs==0.2.24
-python-multipart==0.0.6
+elevenlabs>=0.3.0
+python-multipart>=0.0.9
 requests==2.31.0
 Pillow==10.0.0
-numpy==1.24.3
+numpy>=1.24.3
 pydub==0.25.1
 soundfile==0.12.1 
