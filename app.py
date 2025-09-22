@@ -1,0 +1,1036 @@
+#!/usr/bin/env python3
+"""
+MediLens Local - Medical AI Assistant
+Complete medical AI system with chat, document analysis, and image triage
+"""
+
+import streamlit as st
+import requests
+import json
+import os
+import threading
+import time
+from pathlib import Path
+from datetime import datetime
+from typing import Dict, Any, List
+from config import config
+
+# Import services
+try:
+    from services.chat_service import MedicalChatService
+    from services.safety_guard import SafetyGuard
+    from services.document_service import DocumentProcessor
+    from services.vision_service import VisionAnalyzer
+    SERVICES_AVAILABLE = True
+except ImportError as e:
+    SERVICES_AVAILABLE = False
+    st.error(f"Services not available: {e}")
+
+# Auto-start Ollama service
+config.start_ollama_service()
+
+# Initialize services
+if SERVICES_AVAILABLE:
+    chat_service = MedicalChatService()
+    safety_guard = SafetyGuard()
+    document_processor = DocumentProcessor()
+    vision_analyzer = VisionAnalyzer()
+
+# Page configuration
+st.set_page_config(
+    page_title="MediLens Local",
+    page_icon="🏥",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
+def initialize_session_state():
+    """Initialize session state variables."""
+    if 'chat_history' not in st.session_state:
+        st.session_state.chat_history = []
+    if 'current_page' not in st.session_state:
+        st.session_state.current_page = "chat"
+    if 'user_name' not in st.session_state:
+        st.session_state.user_name = "User"
+    if 'processing_message' not in st.session_state:
+        st.session_state.processing_message = False
+
+def check_ollama_status():
+    """Check if Ollama service is running."""
+    try:
+        response = requests.get("http://localhost:11434/api/tags", timeout=5)
+        return response.status_code == 200, response.json() if response.status_code == 200 else None
+    except:
+        return False, None
+
+def render_sidebar():
+    """Render informational sidebar."""
+    with st.sidebar:
+        st.markdown("# 🏥 MediLens Local")
+        st.markdown("*Your Private Medical AI Assistant*")
+
+        # Navigation
+        st.markdown("---")
+
+        if st.button("💬 Medical Chat", key="nav_chat", use_container_width=True):
+            st.session_state.current_page = "chat"
+            st.rerun()
+
+        if st.button("📄 Report Analysis", key="nav_docs", use_container_width=True):
+            st.session_state.current_page = "documents"
+            st.rerun()
+
+        if st.button("🖼️ Image Analysis", key="nav_images", use_container_width=True):
+            st.session_state.current_page = "images"
+            st.rerun()
+
+        # System Status
+        st.markdown("---")
+        ollama_running, models_data = check_ollama_status()
+        if ollama_running:
+            st.success("✅ System Online")
+            if models_data and 'models' in models_data:
+                model_count = len(models_data['models'])
+                st.info(f"📦 {model_count} AI models loaded")
+
+                # Show speed optimization status
+                models = [model['name'] for model in models_data['models']]
+                if any('gemma2:2b' in model for model in models):
+                    st.success("⚡ Ultra-Fast Mode Active (gemma2:2b)")
+                elif any('qwen2:1.5b' in model for model in models):
+                    st.success("🚀 Lightning Mode Active (qwen2:1.5b)")
+                elif any('phi3:mini' in model for model in models):
+                    st.info("🔥 Fast Mode Active (phi3:mini)")
+                else:
+                    st.warning("🐢 Standard Mode")
+        else:
+            st.error("❌ System Offline")
+
+        # Medical Information
+        st.markdown("---")
+        with st.expander("🩺 Medical Guidelines", expanded=False):
+            st.markdown("""
+            **Important:**
+            - This is AI assistance, not medical diagnosis
+            - Always consult healthcare professionals
+            - For emergencies, call emergency services
+            - AI responses are preliminary guidance only
+
+            **Capabilities:**
+            - Symptom assessment and guidance
+            - Medical information and explanations
+            - Treatment suggestions and care tips
+            - Lab result interpretation assistance
+            """)
+
+        with st.expander("⚙️ Settings", expanded=False):
+            # Model selection
+            if models_data and 'models' in models_data:
+                available_models = [model['name'] for model in models_data['models']]
+                selected_model = st.selectbox(
+                    "AI Model",
+                    options=available_models,
+                    index=0 if available_models else 0,
+                    help="Select which AI model to use"
+                )
+
+            # Temperature setting
+            temperature = st.slider(
+                "Response Style",
+                min_value=0.0,
+                max_value=1.0,
+                value=0.1,
+                step=0.1,
+                help="Lower = More focused, Higher = More creative"
+            )
+
+            # Clear chat
+            if st.button("🗑️ Clear Conversation", use_container_width=True):
+                st.session_state.chat_history = []
+                st.success("Conversation cleared!")
+                st.rerun()
+
+        # Privacy Notice
+        st.markdown("---")
+        st.markdown("### 🔒 Privacy First")
+        st.caption("100% local processing - your data never leaves your device")
+
+# NUCLEAR CSS OVERHAUL - ULTIMATE BACKGROUND AND STYLING FIX
+def load_css():
+    """Load nuclear-level CSS for medical interface."""
+    st.markdown("""
+    <style>
+    /* Hide Streamlit defaults */
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    header {visibility: hidden;}
+    .stDeployButton {display: none;}
+    .stToolbar {display: none;}
+
+    /* NUCLEAR BACKGROUND SOLUTION - FORCE GRADIENT ON HTML/BODY FIRST */
+    html {
+        background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%) !important;
+        min-height: 100vh !important;
+        height: 100% !important;
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+
+    body {
+        background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%) !important;
+        min-height: 100vh !important;
+        height: 100% !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        color: #f8fafc !important;
+    }
+
+    /* SELECTIVE TRANSPARENT OVERRIDE - PRESERVE SIDEBAR AND UI CONTRAST */
+    .main, .main > div,
+    [data-testid="stMainBlockContainer"],
+    [data-testid="stVerticalBlock"],
+    [data-testid="stAppViewContainer"] {
+        background: transparent !important;
+        background-color: transparent !important;
+        background-image: none !important;
+    }
+
+    /* STREAMLIT ROOT CONTAINER - FORCE GRADIENT */
+    #root, [data-testid="stApp"], .stApp {
+        background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%) !important;
+        min-height: 100vh !important;
+        height: auto !important;
+        color: #f8fafc !important;
+    }
+
+    /* TARGETED MAIN CONTENT TRANSPARENCY - PRESERVE UI ELEMENTS */
+    .main .block-container,
+    [data-testid="stMain"] .block-container,
+    [data-testid="stMainBlockContainer"] {
+        background: transparent !important;
+        background-color: transparent !important;
+        background-image: none !important;
+    }
+
+    /* BOTTOM AREA NUCLEAR FIX */
+    [data-testid="stChatInputContainer"], [data-testid="stChatInputContainer"] > div,
+    [data-testid="stChatInputContainer"] > div > div, [data-testid="stChatInputContainer"] > div > div > div,
+    .stChatInput, .stChatInput > div, .stChatInput > div > div,
+    .stForm, [data-testid="stForm"], .stForm > div, [data-testid="stForm"] > div,
+    .stBottom, [data-testid="stBottom"], .stBottom > div, [data-testid="stBottom"] > div {
+        background: transparent !important;
+        background-color: transparent !important;
+        border: none !important;
+    }
+
+    /* ENSURE GRADIENT REACHES BOTTOM - ULTIMATE FIX */
+    [data-testid="stApp"]::after {
+        content: "";
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        height: 200px;
+        background: linear-gradient(to top, #0f172a 50%, transparent 100%);
+        z-index: -1;
+        pointer-events: none;
+    }
+
+    /* Chat container with auto-scroll */
+    #chat-container {
+        max-height: 60vh;
+        overflow-y: auto;
+        scroll-behavior: smooth;
+        padding: 1rem;
+        margin-bottom: 1rem;
+        background: transparent !important;
+    }
+
+    /* PROPER CHAT INPUT STYLING WITH CONTRAST */
+    .stChatInput > div, [data-testid="stChatInput"] > div {
+        background: rgba(30, 41, 59, 0.9) !important;
+        border: 2px solid #3b82f6 !important;
+        border-radius: 24px !important;
+        box-shadow: 0 4px 20px rgba(59, 130, 246, 0.3) !important;
+    }
+
+    /* Chat input text */
+    .stChatInput input {
+        color: #f1f5f9 !important;
+        background: transparent !important;
+    }
+
+    .stChatInput input::placeholder {
+        color: #94a3b8 !important;
+    }
+
+    /* Medical floating background icons */
+    @keyframes float1 {
+        0%, 100% { transform: translateY(0) translateX(0) rotate(0deg); opacity: 0.03; }
+        25% { transform: translateY(-20px) translateX(10px) rotate(90deg); opacity: 0.05; }
+        50% { transform: translateY(0) translateX(-10px) rotate(180deg); opacity: 0.03; }
+        75% { transform: translateY(20px) translateX(5px) rotate(270deg); opacity: 0.05; }
+    }
+
+    @keyframes float2 {
+        0%, 100% { transform: translateY(0) translateX(0) rotate(0deg); opacity: 0.03; }
+        33% { transform: translateY(30px) translateX(-20px) rotate(120deg); opacity: 0.05; }
+        66% { transform: translateY(-15px) translateX(15px) rotate(240deg); opacity: 0.03; }
+    }
+
+    .medical-bg {
+        position: fixed;
+        width: 100%;
+        height: 100%;
+        top: 0;
+        left: 0;
+        pointer-events: none;
+        z-index: 0;
+        overflow: hidden;
+    }
+
+    .medical-icon {
+        position: absolute;
+        font-size: 80px;
+        color: #60a5fa;
+        opacity: 0.03;
+    }
+
+    .icon1 { top: 10%; left: 10%; animation: float1 20s infinite ease-in-out; }
+    .icon2 { top: 20%; left: 80%; animation: float2 25s infinite ease-in-out; }
+    .icon3 { top: 60%; left: 20%; animation: float1 30s infinite ease-in-out; }
+    .icon4 { top: 70%; left: 70%; animation: float2 22s infinite ease-in-out; }
+    .icon5 { top: 40%; left: 50%; animation: float1 28s infinite ease-in-out; }
+    .icon6 { top: 85%; left: 40%; animation: float2 24s infinite ease-in-out; }
+
+    /* Welcome container */
+    .welcome-container {
+        text-align: center;
+        padding: 40px 20px;
+        max-width: 700px;
+        margin: 0 auto;
+    }
+
+    .welcome-title {
+        font-size: 36px;
+        font-weight: 700;
+        background: linear-gradient(135deg, #60a5fa 0%, #a78bfa 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        margin-bottom: 16px;
+        letter-spacing: -0.5px;
+    }
+
+    .welcome-subtitle {
+        font-size: 18px;
+        color: #94a3b8;
+        margin-bottom: 30px;
+        font-weight: 400;
+    }
+
+    /* Chat messages */
+    .user-message {
+        display: flex;
+        justify-content: flex-end;
+        margin: 16px 0;
+        padding: 0 20px;
+    }
+
+    .assistant-message {
+        display: flex;
+        justify-content: flex-start;
+        margin: 16px 0;
+        padding: 0 20px;
+    }
+
+    .user-bubble {
+        background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+        color: white;
+        padding: 12px 16px;
+        border-radius: 16px 16px 4px 16px;
+        max-width: 70%;
+        word-wrap: break-word;
+        box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+    }
+
+    .assistant-bubble {
+        background: rgba(30, 41, 59, 0.9);
+        color: #f1f5f9;
+        padding: 12px 16px;
+        border-radius: 16px 16px 16px 4px;
+        max-width: 70%;
+        word-wrap: break-word;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        border: 1px solid rgba(100, 116, 139, 0.3);
+    }
+
+    /* Page content styling */
+    .main-content {
+        position: relative;
+        z-index: 1;
+        padding: 20px;
+    }
+
+    /* File uploader styling */
+    .stFileUploader {
+        background: rgba(30, 41, 59, 0.5);
+        border: 2px dashed #60a5fa;
+        border-radius: 12px;
+        padding: 20px;
+        text-align: center;
+    }
+
+    /* PROPER MAIN CONTENT BUTTON STYLING */
+    .stButton > button {
+        background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%) !important;
+        color: white !important;
+        border: none !important;
+        border-radius: 8px !important;
+        padding: 0.5rem 1rem !important;
+        font-weight: 600 !important;
+        transition: all 0.3s ease !important;
+        box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3) !important;
+    }
+
+    .stButton > button:hover {
+        background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%) !important;
+        transform: translateY(-2px) !important;
+        box-shadow: 0 4px 16px rgba(59, 130, 246, 0.4) !important;
+    }
+
+    /* PROPER SIDEBAR STYLING - DISTINCT FROM MAIN CONTENT */
+    [data-testid="stSidebar"], .css-1d391kg {
+        background: linear-gradient(180deg, #1e293b 0%, #334155 100%) !important;
+        border-right: 1px solid #475569 !important;
+        box-shadow: 2px 0 10px rgba(0, 0, 0, 0.3) !important;
+    }
+
+    /* Sidebar content styling */
+    [data-testid="stSidebar"] .stMarkdown,
+    [data-testid="stSidebar"] .stButton,
+    [data-testid="stSidebar"] .stSelectbox,
+    [data-testid="stSidebar"] .stSlider,
+    [data-testid="stSidebar"] .stExpander {
+        background: transparent;
+    }
+
+    /* Sidebar buttons */
+    [data-testid="stSidebar"] .stButton > button {
+        background: linear-gradient(135deg, #475569 0%, #64748b 100%) !important;
+        color: #f1f5f9 !important;
+        border: 1px solid #64748b !important;
+        border-radius: 8px !important;
+        transition: all 0.3s ease !important;
+    }
+
+    [data-testid="stSidebar"] .stButton > button:hover {
+        background: linear-gradient(135deg, #64748b 0%, #475569 100%) !important;
+        border-color: #94a3b8 !important;
+        transform: translateY(-1px) !important;
+    }
+
+    /* Sidebar text */
+    [data-testid="stSidebar"] .stMarkdown h1,
+    [data-testid="stSidebar"] .stMarkdown h2,
+    [data-testid="stSidebar"] .stMarkdown h3,
+    [data-testid="stSidebar"] .stMarkdown p {
+        color: #f1f5f9 !important;
+    }
+
+    /* Sidebar success/info messages */
+    [data-testid="stSidebar"] .stSuccess {
+        background: rgba(34, 197, 94, 0.2) !important;
+        border: 1px solid #22c55e !important;
+        color: #bbf7d0 !important;
+    }
+
+    [data-testid="stSidebar"] .stInfo {
+        background: rgba(59, 130, 246, 0.2) !important;
+        border: 1px solid #3b82f6 !important;
+        color: #dbeafe !important;
+    }
+
+    [data-testid="stSidebar"] .stError {
+        background: rgba(239, 68, 68, 0.2) !important;
+        border: 1px solid #ef4444 !important;
+        color: #fecaca !important;
+    }
+
+    /* PROPERLY POSITIONED SIDEBAR TOGGLE BUTTON */
+    .sidebar-toggle {
+        position: fixed !important;
+        top: 15px !important;
+        left: 15px !important;
+        z-index: 99999 !important;
+        background: rgba(30, 41, 59, 0.9) !important;
+        color: white !important;
+        border: 1px solid #475569 !important;
+        border-radius: 8px !important;
+        padding: 8px 12px !important;
+        cursor: pointer !important;
+        font-size: 16px !important;
+        font-weight: bold !important;
+        transition: all 0.3s ease !important;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.4) !important;
+        min-width: 40px !important;
+        min-height: 36px !important;
+        display: none !important;
+        visibility: hidden !important;
+        opacity: 0 !important;
+    }
+
+    /* Show toggle button when sidebar is hidden */
+    .sidebar-toggle.show {
+        display: block !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+    }
+
+    .sidebar-toggle:hover {
+        background: #2563eb !important;
+        transform: scale(1.1) !important;
+        box-shadow: 0 6px 16px rgba(0,0,0,0.4) !important;
+    }
+
+    .sidebar-toggle:active {
+        transform: scale(0.95) !important;
+    }
+
+    /* Ensure sidebar can be hidden/shown properly */
+    [data-testid="stSidebar"] {
+        transition: all 0.3s ease !important;
+        z-index: 1000;
+    }
+
+    [data-testid="stAppViewContainer"] {
+        transition: margin-left 0.3s ease !important;
+    }
+
+    /* PROPER ALERT STYLING WITH CONTRAST */
+    .stAlert {
+        border-radius: 8px !important;
+        border: none !important;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2) !important;
+    }
+
+    /* Success alerts */
+    [data-testid="stAlert"][data-baseweb="notification"] div[data-testid="stNotificationContentSuccess"] {
+        background: rgba(34, 197, 94, 0.15) !important;
+        border: 1px solid #22c55e !important;
+        color: #bbf7d0 !important;
+    }
+
+    /* Info alerts */
+    [data-testid="stAlert"][data-baseweb="notification"] div[data-testid="stNotificationContentInfo"] {
+        background: rgba(59, 130, 246, 0.15) !important;
+        border: 1px solid #3b82f6 !important;
+        color: #dbeafe !important;
+    }
+
+    /* Error alerts */
+    [data-testid="stAlert"][data-baseweb="notification"] div[data-testid="stNotificationContentError"] {
+        background: rgba(239, 68, 68, 0.15) !important;
+        border: 1px solid #ef4444 !important;
+        color: #fecaca !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
+def render_medical_background():
+    """Render floating medical icons in background."""
+    st.markdown("""
+    <div class="medical-bg">
+        <div class="medical-icon icon1">🩺</div>
+        <div class="medical-icon icon2">💊</div>
+        <div class="medical-icon icon3">🏥</div>
+        <div class="medical-icon icon4">❤️</div>
+        <div class="medical-icon icon5">🔬</div>
+        <div class="medical-icon icon6">🩹</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+def render_welcome_screen():
+    """Render welcome screen for chat."""
+    st.markdown("""
+    <div class="welcome-container">
+        <div class="welcome-title">How are you feeling today?</div>
+        <div class="welcome-subtitle">I'm here to help with your medical questions</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+def render_chat_message(message, is_user=True):
+    """Render a single chat message."""
+    if is_user:
+        st.markdown(f"""
+        <div class="user-message">
+            <div class="user-bubble">{message}</div>
+        </div>
+        """, unsafe_allow_html=True)
+    else:
+        st.markdown(f"""
+        <div class="assistant-message">
+            <div class="assistant-bubble">{message}</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+def process_user_message(user_message):
+    """Process user message and generate AI response."""
+    if not SERVICES_AVAILABLE:
+        error_msg = "❌ Medical services are not available. Please check the services installation."
+        st.session_state.chat_history.append({"role": "assistant", "content": error_msg})
+        return
+
+    # Test connection
+    connected, status_msg = chat_service.test_connection()
+    if not connected:
+        error_msg = f"❌ Cannot connect to AI service: {status_msg}"
+        st.session_state.chat_history.append({"role": "assistant", "content": error_msg})
+        return
+
+    try:
+        # SIMPLE NON-STREAMING APPROACH - GUARANTEED TO WORK
+        with st.spinner("🤔 Thinking..."):
+            # Get complete response from Ollama
+            response_data = chat_service.get_medical_response(user_message, st.session_state.chat_history[:-1])
+
+            if response_data["success"]:
+                ai_response = response_data["response"]
+                if isinstance(ai_response, dict):
+                    # Format structured response
+                    formatted_response = format_medical_response(ai_response)
+                else:
+                    formatted_response = str(ai_response)
+
+                st.session_state.chat_history.append({"role": "assistant", "content": formatted_response})
+            else:
+                error_response = f"❌ Error: {response_data.get('error', 'Unknown error occurred')}"
+                st.session_state.chat_history.append({"role": "assistant", "content": error_response})
+
+    except Exception as e:
+        error_response = f"❌ Error processing query: {str(e)}"
+        st.session_state.chat_history.append({"role": "assistant", "content": error_response})
+
+def format_medical_response(response_dict):
+    """Format structured medical response for display with proper formatting."""
+    if not isinstance(response_dict, dict):
+        return str(response_dict)
+
+    # Get the full response from summary
+    summary = response_dict.get("summary", "")
+
+    if summary:
+        # Clean up the response to ensure proper formatting
+        formatted_response = summary
+
+        # Ensure proper line breaks after sections
+        formatted_response = formatted_response.replace("**Likely Causes:**", "\n**🔍 Likely Causes:**\n")
+        formatted_response = formatted_response.replace("**What To Do Now:**", "\n\n**⚡ What To Do Now:**\n")
+        formatted_response = formatted_response.replace("**See Doctor If:**", "\n\n**🚨 See Doctor If:**\n")
+        formatted_response = formatted_response.replace("**Additional Notes:**", "\n\n**💡 Additional Notes:**\n")
+
+        # Ensure bullet points are properly formatted with line breaks
+        formatted_response = formatted_response.replace("• **", "\n• **")
+        formatted_response = formatted_response.replace("• ", "\n• ")
+
+        # Clean up any double line breaks
+        formatted_response = formatted_response.replace("\n\n\n", "\n\n")
+        formatted_response = formatted_response.strip()
+
+        return formatted_response
+    else:
+        # Fallback if no summary available
+        return "Unable to generate medical response. Please try again."
+
+def render_chat_page():
+    """Render the main chat page with auto-scroll functionality."""
+    # Chat container with unique ID for auto-scroll
+    st.markdown('<div class="main-content" id="chat-container">', unsafe_allow_html=True)
+
+    # Welcome message or chat history
+    if not st.session_state.chat_history:
+        render_welcome_screen()
+    else:
+        # Display chat history
+        for message in st.session_state.chat_history:
+            if message["role"] == "user":
+                render_chat_message(message["content"], is_user=True)
+            else:
+                render_chat_message(message["content"], is_user=False)
+
+    st.markdown('</div>', unsafe_allow_html=True)
+
+    # Auto-scroll JavaScript - executes after chat content is rendered
+    if st.session_state.chat_history:
+        st.markdown("""
+        <script>
+        // ChatGPT-style auto-scroll to latest message
+        function scrollToBottom() {
+            const chatContainer = document.getElementById('chat-container');
+            if (chatContainer) {
+                chatContainer.scrollTop = chatContainer.scrollHeight;
+            }
+        }
+
+        // Wait for content to load, then scroll
+        setTimeout(scrollToBottom, 100);
+
+        // Also scroll on page load and content changes
+        window.addEventListener('load', scrollToBottom);
+        document.addEventListener('DOMContentLoaded', scrollToBottom);
+
+        // Observe for new messages and auto-scroll
+        const observer = new MutationObserver(function(mutations) {
+            mutations.forEach(function(mutation) {
+                if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
+                    setTimeout(scrollToBottom, 50);
+                }
+            });
+        });
+
+        const chatContainer = document.getElementById('chat-container');
+        if (chatContainer) {
+            observer.observe(chatContainer, { childList: true, subtree: true });
+        }
+        </script>
+        """, unsafe_allow_html=True)
+
+    # Chat input
+    if prompt := st.chat_input("Ask me anything medical..."):
+        # Add user message immediately to show it
+        st.session_state.chat_history.append({"role": "user", "content": prompt})
+        st.session_state.processing_message = True
+
+        # Rerun to display user message first
+        st.rerun()
+
+    # Process any pending user message
+    if st.session_state.processing_message and st.session_state.chat_history:
+        last_message = st.session_state.chat_history[-1]
+        if last_message["role"] == "user":
+            # Process message and generate response
+            process_user_message(last_message["content"])
+            st.session_state.processing_message = False
+            # CRITICAL FIX: Rerun to display the AI response!
+            st.rerun()
+
+def render_documents_page():
+    """Render document analysis page."""
+    st.markdown('<div class="main-content">', unsafe_allow_html=True)
+
+    st.title("📄 Medical Report Analysis")
+    st.info("Upload medical documents, lab reports, or test results for AI-powered analysis and interpretation.")
+
+    uploaded_file = st.file_uploader(
+        "Choose a medical document",
+        type=['pdf', 'jpg', 'jpeg', 'png'],
+        help="Supports PDF documents and images"
+    )
+
+    if uploaded_file and SERVICES_AVAILABLE:
+        with st.spinner("🔄 Processing document..."):
+            file_bytes = uploaded_file.read()
+            file_type = uploaded_file.type
+            filename = uploaded_file.name
+
+            # Process document
+            processing_result = document_processor.process_document(file_bytes, file_type, filename)
+
+        if processing_result["success"]:
+            st.success("✅ Document processed successfully")
+
+            # Show extracted text
+            with st.expander("📄 Extracted Text", expanded=True):
+                st.text_area("Content:", processing_result["extracted_text"], height=200, disabled=True)
+
+            # AI Analysis
+            st.subheader("🧠 AI Medical Analysis")
+            with st.spinner("Analyzing document..."):
+                analysis_result = document_processor.analyze_medical_document(processing_result["extracted_text"])
+
+            if analysis_result["success"]:
+                st.markdown(analysis_result["analysis"])
+            else:
+                st.error(f"Analysis failed: {analysis_result.get('error', 'Unknown error')}")
+
+        else:
+            st.error(f"Document processing failed: {processing_result.get('error', 'Unknown error')}")
+
+    st.markdown('</div>', unsafe_allow_html=True)
+
+def render_images_page():
+    """Render image analysis page."""
+    st.markdown('<div class="main-content">', unsafe_allow_html=True)
+
+    st.title("🖼️ Medical Image Analysis")
+    st.info("Upload medical images for AI-powered analysis and preliminary assessment.")
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        uploaded_image = st.file_uploader("Upload Image", type=['jpg', 'jpeg', 'png'])
+
+    with col2:
+        camera_image = st.camera_input("Take Photo")
+
+    image_to_analyze = uploaded_image or camera_image
+
+    if image_to_analyze and SERVICES_AVAILABLE:
+        # Test vision model
+        connected, status_msg = vision_analyzer.test_vision_model_connection()
+        if not connected:
+            st.error(f"❌ Vision model not available: {status_msg}")
+            return
+
+        # Display image
+        st.image(image_to_analyze, caption="Medical Image", use_column_width=True)
+
+        # Optional query
+        user_query = st.text_input("Specific question about the image (optional):")
+
+        # Analyze image
+        if st.button("🔍 Analyze Image"):
+            with st.spinner("🔍 Analyzing image..."):
+                image_bytes = image_to_analyze.read()
+                analysis_result = vision_analyzer.analyze_medical_image(
+                    image_bytes,
+                    user_query if user_query.strip() else None
+                )
+
+            if analysis_result["success"]:
+                st.success("✅ Analysis completed")
+
+                # Show analysis
+                raw_response = analysis_result.get("raw_response", "")
+                if raw_response:
+                    st.markdown("### 🔍 Analysis Results")
+                    st.write(raw_response)
+
+                # Check for emergency indicators
+                emergency_keywords = vision_analyzer.detect_emergency_indicators(raw_response)
+                if emergency_keywords:
+                    st.error(f"🚨 **URGENT INDICATORS DETECTED:** {', '.join(emergency_keywords)}")
+                    st.error("**Seek immediate medical attention.**")
+
+            else:
+                st.error(f"Analysis failed: {analysis_result.get('error', 'Unknown error')}")
+
+    st.markdown('</div>', unsafe_allow_html=True)
+
+def main():
+    """Main application function."""
+    # Initialize session state
+    initialize_session_state()
+
+    # Load CSS and render background
+    load_css()
+    render_medical_background()
+
+    # NUCLEAR SIDEBAR TOGGLE - ULTIMATE SOLUTION
+    st.markdown("""
+    <div id="sidebar-toggle-container">
+        <button class="sidebar-toggle" onclick="nuclearSidebarToggle()" id="sidebar-toggle">
+            ☰
+        </button>
+    </div>
+
+    <script>
+    // ULTRA-PERSISTENT GLOBAL STATE
+    window.SIDEBAR_STATE = {
+        hidden: false,
+        initialized: false,
+        attempts: 0
+    };
+
+    function nuclearSidebarToggle() {
+        console.log('🚀 NUCLEAR TOGGLE ACTIVATED - State:', window.SIDEBAR_STATE);
+
+        // EXHAUSTIVE ELEMENT SEARCH
+        const sidebarSelectors = [
+            '[data-testid="stSidebar"]',
+            '.css-1d391kg',
+            'section[data-testid="stSidebar"]',
+            '.stSidebar',
+            '.sidebar',
+            'div[data-testid="stSidebar"]',
+            'aside[data-testid="stSidebar"]'
+        ];
+
+        const mainContentSelectors = [
+            '[data-testid="stAppViewContainer"]',
+            '.main',
+            '[data-testid="stMain"]',
+            '.stAppViewContainer',
+            '.main-content',
+            '.app-view-container'
+        ];
+
+        let sidebar = null;
+        let mainContent = null;
+
+        // Try every possible selector
+        for (const selector of sidebarSelectors) {
+            sidebar = document.querySelector(selector);
+            if (sidebar) break;
+        }
+
+        for (const selector of mainContentSelectors) {
+            mainContent = document.querySelector(selector);
+            if (mainContent) break;
+        }
+
+        const toggleBtn = document.getElementById('sidebar-toggle');
+
+        console.log('🔍 Elements located:', {
+            sidebar: sidebar ? 'FOUND' : 'NOT FOUND',
+            mainContent: mainContent ? 'FOUND' : 'NOT FOUND',
+            toggleBtn: toggleBtn ? 'FOUND' : 'NOT FOUND'
+        });
+
+        if (!sidebar) {
+            console.error('💥 CRITICAL: No sidebar element found with any selector!');
+            alert('❌ Sidebar not found! Page may not be fully loaded.');
+            return;
+        }
+
+        if (!toggleBtn) {
+            console.error('💥 CRITICAL: Toggle button not found!');
+            return;
+        }
+
+        // EXECUTE TOGGLE
+        if (!window.SIDEBAR_STATE.hidden) {
+            // === HIDE SIDEBAR ===
+            sidebar.style.setProperty('display', 'none', 'important');
+            sidebar.style.setProperty('visibility', 'hidden', 'important');
+            sidebar.style.setProperty('width', '0px', 'important');
+            sidebar.style.setProperty('min-width', '0px', 'important');
+            sidebar.style.setProperty('max-width', '0px', 'important');
+            sidebar.style.setProperty('opacity', '0', 'important');
+            sidebar.style.setProperty('transform', 'translateX(-100%)', 'important');
+            sidebar.style.setProperty('pointer-events', 'none', 'important');
+
+            if (mainContent) {
+                mainContent.style.setProperty('margin-left', '0px', 'important');
+                mainContent.style.setProperty('padding-left', '20px', 'important');
+            }
+
+            toggleBtn.innerHTML = '☰';
+            toggleBtn.className = 'sidebar-toggle show';
+            toggleBtn.title = '📂 Show Sidebar';
+
+            window.SIDEBAR_STATE.hidden = true;
+            console.log('✅ Sidebar HIDDEN successfully');
+
+        } else {
+            // === SHOW SIDEBAR ===
+            sidebar.style.removeProperty('display');
+            sidebar.style.removeProperty('visibility');
+            sidebar.style.removeProperty('width');
+            sidebar.style.removeProperty('min-width');
+            sidebar.style.removeProperty('max-width');
+            sidebar.style.removeProperty('opacity');
+            sidebar.style.removeProperty('transform');
+            sidebar.style.removeProperty('pointer-events');
+
+            if (mainContent) {
+                mainContent.style.removeProperty('margin-left');
+                mainContent.style.removeProperty('padding-left');
+            }
+
+            // Hide the toggle button when sidebar is visible
+            toggleBtn.className = 'sidebar-toggle';
+            toggleBtn.innerHTML = '☰';
+            toggleBtn.title = '📂 Show Sidebar';
+
+            window.SIDEBAR_STATE.hidden = false;
+            console.log('✅ Sidebar SHOWN successfully');
+        }
+    }
+
+    // PROPER INITIALIZATION
+    function nuclearInitialization() {
+        window.SIDEBAR_STATE.attempts++;
+        console.log(`🔄 Sidebar init attempt #${window.SIDEBAR_STATE.attempts}`);
+
+        const toggleBtn = document.getElementById('sidebar-toggle');
+        if (toggleBtn && !window.SIDEBAR_STATE.initialized) {
+            // Initially hide the toggle button (sidebar is visible by default)
+            toggleBtn.className = 'sidebar-toggle';
+            toggleBtn.innerHTML = '☰';
+            toggleBtn.title = '📂 Show Sidebar';
+            window.SIDEBAR_STATE.hidden = false;
+            window.SIDEBAR_STATE.initialized = true;
+            console.log('✅ Sidebar toggle INITIALIZED');
+            return true;
+        }
+        return false;
+    }
+
+    // IMMEDIATE EXECUTION
+    nuclearInitialization();
+
+    // DOM READY HANDLERS
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', function() {
+            setTimeout(nuclearInitialization, 50);
+            setTimeout(nuclearInitialization, 200);
+            setTimeout(nuclearInitialization, 500);
+            setTimeout(nuclearInitialization, 1000);
+        });
+    } else {
+        setTimeout(nuclearInitialization, 50);
+        setTimeout(nuclearInitialization, 200);
+    }
+
+    // WINDOW LOAD HANDLERS
+    window.addEventListener('load', function() {
+        setTimeout(nuclearInitialization, 50);
+        setTimeout(nuclearInitialization, 300);
+        setTimeout(nuclearInitialization, 800);
+    });
+
+    // PERSISTENT MONITORING - Check every 500ms for 10 seconds
+    let monitorAttempts = 0;
+    const MONITOR_INTERVAL = setInterval(function() {
+        if (window.SIDEBAR_STATE.initialized || monitorAttempts > 20) {
+            clearInterval(MONITOR_INTERVAL);
+            console.log('🏁 Nuclear monitoring completed');
+        } else {
+            nuclearInitialization();
+        }
+        monitorAttempts++;
+    }, 500);
+
+    // MUTATION OBSERVER FOR DYNAMIC CONTENT
+    const observer = new MutationObserver(function(mutations) {
+        if (!window.SIDEBAR_STATE.initialized) {
+            setTimeout(nuclearInitialization, 100);
+        }
+    });
+
+    observer.observe(document.body, {
+        childList: true,
+        subtree: true,
+        attributes: true
+    });
+
+    console.log('🚀 Nuclear sidebar toggle system LOADED');
+    </script>
+    """, unsafe_allow_html=True)
+
+    # Render sidebar
+    render_sidebar()
+
+    # Page routing
+    if st.session_state.current_page == "chat":
+        render_chat_page()
+    elif st.session_state.current_page == "documents":
+        render_documents_page()
+    elif st.session_state.current_page == "images":
+        render_images_page()
+    else:
+        render_chat_page()
+
+if __name__ == "__main__":
+    main()
