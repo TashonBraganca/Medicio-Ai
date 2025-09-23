@@ -8,6 +8,7 @@ import requests
 import json
 import time
 import re
+import platform
 from typing import Dict, List, Any, Optional, Tuple, Generator
 from datetime import datetime
 import logging
@@ -23,35 +24,86 @@ class MedicalChatService:
     """Handles medical chat interactions with Ollama."""
     
     def __init__(self):
+        # Initialize with universal compatibility
         self.base_url = config.OLLAMA_BASE_URL
-        self.timeout = config.OLLAMA_TIMEOUT
+        self.timeout = config.get_os_optimized_timeout(config.OLLAMA_TIMEOUT)
         self.retry_attempts = config.OLLAMA_RETRY_ATTEMPTS
-        self.model = config.DEFAULT_LLM_MODEL  # ULTRA-FAST GEMMA2:2B
+        self.model = config.DEFAULT_LLM_MODEL
         self.safety_guard = SafetyGuard()
+
+        # Initialize connection and ensure models
+        self._initialize_universal_connection()
         
-    def test_connection(self) -> Tuple[bool, str]:
-        """Test connection to Ollama service and check for gemma2:2b model."""
+    def _initialize_universal_connection(self) -> None:
+        """Initialize universal cross-platform Ollama connection."""
         try:
-            response = requests.get(f"{self.base_url}/api/tags", timeout=5)
+            # Step 1: Detect or start Ollama service
+            is_running, url, message = config.detect_ollama_service()
+
+            if not is_running:
+                logger.info("Ollama not detected, attempting to start...")
+                started, start_message = config.start_ollama_service()
+                if started:
+                    is_running, url, message = config.detect_ollama_service()
+
+            if is_running:
+                self.base_url = url  # Use detected working URL
+                logger.info(f"Ollama connection established: {message}")
+
+                # Step 2: Ensure models are available
+                success, available, missing = config.ensure_models_available()
+                if success and available:
+                    # Use best available model
+                    best_model = config.get_best_available_model()
+                    if best_model:
+                        self.model = best_model
+                        logger.info(f"Using model: {self.model}")
+
+            else:
+                logger.warning(f"Failed to initialize Ollama: {message}")
+
+        except Exception as e:
+            logger.error(f"Error in universal connection init: {str(e)}")
+
+    def test_connection(self) -> Tuple[bool, str]:
+        """Universal connection test with cross-platform compatibility."""
+        try:
+            # Try current base_url first
+            response = requests.get(f"{self.base_url}/api/tags",
+                                  timeout=config.OLLAMA_CONNECTION_TIMEOUT)
+
             if response.status_code == 200:
                 data = response.json()
                 installed_models = [model['name'] for model in data.get('models', [])]
 
-                # Check if gemma2:2b is available (primary ultra-fast model)
-                if any('gemma2:2b' in model for model in installed_models):
-                    return True, f"Connected to Ollama with gemma2:2b ultra-fast model"
-                # Check fallback model
-                elif any('qwen2:1.5b' in model for model in installed_models):
-                    return True, f"Connected to Ollama with qwen2:1.5b fallback model"
-                # Legacy phi3:mini support
-                elif any('phi3:mini' in model for model in installed_models):
-                    return True, f"Connected to Ollama with phi3:mini model (legacy)"
+                # Check for any available models from hierarchy
+                available_from_hierarchy = []
+                for model in config.MODEL_HIERARCHY:
+                    if any(model in installed for installed in installed_models):
+                        available_from_hierarchy.append(model)
+
+                if available_from_hierarchy:
+                    # Use best available model
+                    self.model = available_from_hierarchy[0]
+                    system_info = platform.system()
+                    return True, f"✅ Connected to Ollama on {system_info} with {self.model}"
                 else:
-                    return False, f"Ultra-fast models not found. Available models: {installed_models}"
+                    return False, f"❌ No compatible models found. Available: {installed_models}"
             else:
-                return False, f"Ollama service returned status code: {response.status_code}"
+                return False, f"❌ Ollama service error: {response.status_code}"
+
+        except requests.exceptions.ConnectionError:
+            # Try to detect service on alternative ports/URLs
+            is_running, url, message = config.detect_ollama_service()
+            if is_running:
+                self.base_url = url
+                return self.test_connection()  # Retry with new URL
+            else:
+                return False, "❌ Cannot connect to Ollama. Service may not be running."
+        except requests.exceptions.Timeout:
+            return False, "❌ Connection timeout. Ollama may be starting up."
         except Exception as e:
-            return False, f"Connection failed: {str(e)}"
+            return False, f"❌ Connection error: {str(e)}"
     
     
     def get_medical_response(self, user_message: str, chat_history: Optional[List[Dict]] = None) -> Dict[str, Any]:
@@ -116,9 +168,9 @@ class MedicalChatService:
             # Prepare messages for Ollama
             messages = self._prepare_messages(user_message, chat_history)
             
-            # Stream response from Ollama with gemma2:2b - ULTRA-FAST
+            # Universal streaming with current best model
             payload = {
-                "model": config.DEFAULT_LLM_MODEL,  # gemma2:2b
+                "model": self.model,
                 "messages": messages,
                 "stream": True,
                 "options": {
@@ -200,73 +252,135 @@ class MedicalChatService:
         return messages
     
     def _call_ollama(self, messages: List[Dict]) -> Dict[str, Any]:
-        """Make API call to Ollama using configured ultra-fast model."""
+        """Universal cross-platform Ollama API call with robust error handling."""
 
-        # Use gemma2:2b model - ULTRA-FAST configuration
+        # Use current best model with OS-optimized settings
         payload = {
-            "model": config.DEFAULT_LLM_MODEL,  # gemma2:2b
+            "model": self.model,
             "messages": messages,
             "stream": False,
             "options": {
                 "temperature": config.CHAT_TEMPERATURE,
                 "num_predict": config.DEFAULT_MAX_TOKENS,
-                "top_k": 20,     # Ultra-reduced for maximum speed
-                "top_p": 0.7,    # Lower for faster token selection
-                "repeat_penalty": 1.0,   # Minimal penalty for speed
-                "num_ctx": 1024,  # Minimal context window for maximum speed
-                "seed": 42  # Fixed seed for consistency
+                "top_k": 20,
+                "top_p": 0.7,
+                "repeat_penalty": 1.0,
+                "num_ctx": 1024,
+                "seed": 42
             }
         }
 
-        logger.info(f"Using {config.DEFAULT_LLM_MODEL} model (ultra-fast)")
+        logger.info(f"Using {self.model} on {platform.system()}")
 
-        try:
-            response = requests.post(
-                f"{self.base_url}/api/chat",
-                json=payload,
-                timeout=self.timeout
-            )
+        # Retry with progressive fallback
+        for attempt in range(self.retry_attempts):
+            try:
+                timeout = self.timeout * (1 + attempt * 0.5)  # Progressive timeout increase
 
-            if response.status_code == 200:
-                data = response.json()
-                if 'message' in data and 'content' in data['message']:
-                    logger.info(f"Successfully received response from {config.DEFAULT_LLM_MODEL}")
-                    return {
-                        "success": True,
-                        "response": data['message']['content'],
-                        "model_used": config.DEFAULT_LLM_MODEL
-                    }
+                response = requests.post(
+                    f"{self.base_url}/api/chat",
+                    json=payload,
+                    timeout=timeout
+                )
+
+                if response.status_code == 200:
+                    data = response.json()
+                    if 'message' in data and 'content' in data['message']:
+                        logger.info(f"✅ Response received from {self.model} (attempt {attempt + 1})")
+                        return {
+                            "success": True,
+                            "response": data['message']['content'],
+                            "model_used": self.model,
+                            "attempt": attempt + 1
+                        }
+                    else:
+                        logger.warning(f"Invalid response format (attempt {attempt + 1})")
+                        continue
+
+                elif response.status_code == 404:
+                    # Model not found - try fallback
+                    logger.warning(f"Model {self.model} not found, trying fallback...")
+                    if self._try_fallback_model():
+                        payload["model"] = self.model
+                        continue
+                    else:
+                        return {
+                            "success": False,
+                            "error": f"Model {self.model} not available and no fallbacks found",
+                            "error_type": "model_not_found"
+                        }
                 else:
+                    logger.warning(f"HTTP {response.status_code} (attempt {attempt + 1})")
+                    if attempt == self.retry_attempts - 1:  # Last attempt
+                        return {
+                            "success": False,
+                            "error": f"HTTP {response.status_code}: {response.text}",
+                            "error_type": "http_error"
+                        }
+
+            except requests.exceptions.Timeout:
+                logger.warning(f"Timeout on attempt {attempt + 1}/{self.retry_attempts}")
+                if attempt == self.retry_attempts - 1:
                     return {
                         "success": False,
-                        "error": "Invalid response format from Ollama",
-                        "error_type": "invalid_response"
+                        "error": f"Request timed out after {self.retry_attempts} attempts. Try a shorter question.",
+                        "error_type": "timeout"
                     }
-            else:
-                return {
-                    "success": False,
-                    "error": f"HTTP {response.status_code}: {response.text}",
-                    "error_type": "http_error"
-                }
 
-        except requests.exceptions.Timeout:
-            return {
-                "success": False,
-                "error": "Request timed out - try a shorter question",
-                "error_type": "timeout"
-            }
-        except requests.exceptions.ConnectionError:
-            return {
-                "success": False,
-                "error": "Cannot connect to Ollama service - check if it's running",
-                "error_type": "connection_error"
-            }
-        except Exception as e:
-            return {
-                "success": False,
-                "error": f"Unexpected error: {str(e)}",
-                "error_type": "unexpected_error"
-            }
+            except requests.exceptions.ConnectionError:
+                logger.warning(f"Connection error on attempt {attempt + 1}")
+                # Try to reconnect
+                if self._attempt_reconnection():
+                    continue
+                elif attempt == self.retry_attempts - 1:
+                    return {
+                        "success": False,
+                        "error": "Cannot connect to Ollama service. Please check if Ollama is running.",
+                        "error_type": "connection_error"
+                    }
+
+            except Exception as e:
+                logger.error(f"Unexpected error on attempt {attempt + 1}: {str(e)}")
+                if attempt == self.retry_attempts - 1:
+                    return {
+                        "success": False,
+                        "error": f"Unexpected error: {str(e)}",
+                        "error_type": "unexpected_error"
+                    }
+
+            # Brief delay between retries
+            if attempt < self.retry_attempts - 1:
+                time.sleep(1 + attempt)
+
+        return {
+            "success": False,
+            "error": "All retry attempts failed",
+            "error_type": "retry_exhausted"
+        }
+
+    def _try_fallback_model(self) -> bool:
+        """Try to switch to a fallback model."""
+        try:
+            best_model = config.get_best_available_model()
+            if best_model and best_model != self.model:
+                logger.info(f"Switching from {self.model} to {best_model}")
+                self.model = best_model
+                return True
+            return False
+        except:
+            return False
+
+    def _attempt_reconnection(self) -> bool:
+        """Attempt to reconnect to Ollama service."""
+        try:
+            is_running, url, message = config.detect_ollama_service()
+            if is_running:
+                self.base_url = url
+                logger.info(f"Reconnected to Ollama at {url}")
+                return True
+            return False
+        except:
+            return False
     
     def _structure_response(self, raw_response: str) -> Dict[str, Any]:
         """Structure the raw Ollama response - SIMPLIFIED FOR GUARANTEED DISPLAY."""

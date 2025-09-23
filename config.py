@@ -5,11 +5,14 @@ Centralized configuration for the medical AI assistant application.
 """
 
 import os
+import sys
+import platform
 import subprocess
 import time
 import requests
+import socket
 from pathlib import Path
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Tuple, Optional
 from datetime import datetime
 
 class MediLensConfig:
@@ -20,17 +23,45 @@ class MediLensConfig:
     APP_VERSION = "1.0.0"
     APP_DESCRIPTION = "Medical AI Assistant - Private & Offline"
     
-    # Ollama Configuration - PHI3:MINI HIGH QUALITY
-    OLLAMA_BASE_URL = "http://localhost:11434"
-    OLLAMA_TIMEOUT = 40  # Ultra-fast gemma2:2b response time (32s + buffer)
-    OLLAMA_DOCUMENT_TIMEOUT = 50  # Document timeout (gemma2:2b optimized)
-    OLLAMA_VISION_TIMEOUT = 120   # Vision timeout (llava:7b needs more time for medical images)
-    OLLAMA_RETRY_ATTEMPTS = 3  # Multiple attempts for better reliability
+    # Universal Ollama Configuration - Cross-Platform Compatible
+    OLLAMA_DEFAULT_PORT = 11434
+    OLLAMA_BASE_URL = f"http://localhost:{OLLAMA_DEFAULT_PORT}"
 
-    # ULTRA-FAST MODEL STRATEGY - GEMMA2:2B PRIMARY
-    DEFAULT_LLM_MODEL = "gemma2:2b"  # PRIMARY model (2B parameters - ultra-fast and accurate)
-    FALLBACK_LLM_MODEL = "qwen2:1.5b"  # FALLBACK model (1.5B parameters - fastest)
-    DEFAULT_VISION_MODEL = "llava:7b"  # Keep existing vision model
+    # Progressive timeout strategy for different systems
+    OLLAMA_TIMEOUT = 60  # Increased for macOS M1/M2 compatibility
+    OLLAMA_DOCUMENT_TIMEOUT = 80  # Extended for complex document analysis
+    OLLAMA_VISION_TIMEOUT = 150   # Extended for vision models on all platforms
+    OLLAMA_RETRY_ATTEMPTS = 5  # More retries for better cross-platform reliability
+    OLLAMA_CONNECTION_TIMEOUT = 10  # Connection timeout for service detection
+
+    # Alternative ports to try if default fails
+    OLLAMA_FALLBACK_PORTS = [11434, 11435, 11436, 8080, 8081]
+
+    # OS-specific timeouts
+    OS_TIMEOUT_MULTIPLIERS = {
+        'Darwin': 1.5,  # macOS needs more time
+        'Windows': 1.0,
+        'Linux': 1.2
+    }
+
+    # Universal Model Strategy - Cross-Platform Compatible
+    # Model hierarchy for maximum compatibility
+    MODEL_HIERARCHY = [
+        "gemma2:2b",     # Primary - fast and accurate
+        "qwen2:1.5b",    # Fast fallback
+        "gemma:2b",      # Alternative naming
+        "phi3:mini",     # Widely available fallback
+        "tinyllama",     # Lightweight option
+        "llama2:7b",     # Common fallback
+    ]
+
+    DEFAULT_LLM_MODEL = "gemma2:2b"  # Will auto-fallback if not available
+    FALLBACK_LLM_MODEL = "qwen2:1.5b"
+    DEFAULT_VISION_MODEL = "llava:7b"
+
+    # Auto-download models if missing
+    AUTO_DOWNLOAD_MODELS = True
+    ESSENTIAL_MODELS = ["gemma2:2b", "qwen2:1.5b"]  # Models to auto-download
     
     # PHI3:MINI ULTRA-FAST Parameters (25-30 second responses)
     DEFAULT_TEMPERATURE = 0.1   # Ultra-low temperature for fast, focused responses
@@ -299,47 +330,164 @@ Be specific, practical, and medically accurate. Focus on actionable guidance."""
         }
     
     @classmethod
-    def start_ollama_service(cls) -> bool:
-        """Automatically start Ollama service if not running."""
-        try:
-            # Check if Ollama is already running
-            response = requests.get(f"{cls.OLLAMA_BASE_URL}/api/tags", timeout=5)
-            if response.status_code == 200:
-                print("Ollama service is already running")
-                return True
-        except:
-            pass
-        
+    def detect_ollama_service(cls) -> Tuple[bool, str, str]:
+        """Universal Ollama service detection across all platforms."""
+        # Try different ports and interfaces
+        test_urls = [
+            f"http://localhost:{port}" for port in cls.OLLAMA_FALLBACK_PORTS
+        ] + [
+            f"http://127.0.0.1:{port}" for port in cls.OLLAMA_FALLBACK_PORTS
+        ]
+
+        # Add OS-specific URLs
+        if platform.system() == 'Darwin':  # macOS
+            test_urls.extend([
+                f"http://0.0.0.0:{port}" for port in cls.OLLAMA_FALLBACK_PORTS
+            ])
+
+        for url in test_urls:
+            try:
+                response = requests.get(f"{url}/api/tags", timeout=3)
+                if response.status_code == 200:
+                    return True, url, f"Found Ollama at {url}"
+            except:
+                continue
+
+        return False, "", "Ollama service not detected on any standard port"
+
+    @classmethod
+    def start_ollama_service(cls) -> Tuple[bool, str]:
+        """Universal Ollama service startup for all platforms."""
+        # First check if already running
+        is_running, url, message = cls.detect_ollama_service()
+        if is_running:
+            cls.OLLAMA_BASE_URL = url  # Update to working URL
+            return True, f"Ollama already running at {url}"
+
         try:
             print("Starting Ollama service...")
-            # Try to start Ollama service in background
-            if os.name == 'nt':  # Windows
-                subprocess.Popen(['ollama', 'serve'], 
-                               creationflags=subprocess.CREATE_NO_WINDOW,
-                               stdout=subprocess.DEVNULL, 
-                               stderr=subprocess.DEVNULL)
-            else:  # Unix/Linux
+            system_os = platform.system()
+
+            # OS-specific service startup
+            if system_os == 'Windows':
+                # Windows startup
                 subprocess.Popen(['ollama', 'serve'],
-                               stdout=subprocess.DEVNULL, 
+                               creationflags=subprocess.CREATE_NO_WINDOW,
+                               stdout=subprocess.DEVNULL,
                                stderr=subprocess.DEVNULL)
-            
-            # Wait for service to start
-            for i in range(10):  # Wait up to 10 seconds
+            elif system_os == 'Darwin':
+                # macOS startup with proper environment
+                env = os.environ.copy()
+                env['OLLAMA_HOST'] = '0.0.0.0:11434'  # Bind to all interfaces on macOS
+                subprocess.Popen(['ollama', 'serve'],
+                               stdout=subprocess.DEVNULL,
+                               stderr=subprocess.DEVNULL,
+                               env=env)
+            else:
+                # Linux/Unix startup
+                subprocess.Popen(['ollama', 'serve'],
+                               stdout=subprocess.DEVNULL,
+                               stderr=subprocess.DEVNULL)
+
+            # Progressive wait with OS-specific timeouts
+            wait_time = 15 if system_os == 'Darwin' else 10
+
+            for i in range(wait_time):
                 time.sleep(1)
-                try:
-                    response = requests.get(f"{cls.OLLAMA_BASE_URL}/api/tags", timeout=2)
-                    if response.status_code == 200:
-                        print("Ollama service started successfully")
-                        return True
-                except:
-                    continue
-            
-            print("WARNING: Ollama service may take longer to start")
-            return False
-            
+                is_running, url, message = cls.detect_ollama_service()
+                if is_running:
+                    cls.OLLAMA_BASE_URL = url  # Update to working URL
+                    return True, f"Ollama started successfully at {url}"
+
+            return False, f"Ollama service startup timeout after {wait_time}s"
+
+        except FileNotFoundError:
+            return False, "Ollama command not found. Please install Ollama first."
         except Exception as e:
-            print(f"ERROR: Failed to start Ollama service: {e}")
+            return False, f"Failed to start Ollama: {str(e)}"
+
+    @classmethod
+    def ensure_models_available(cls) -> Tuple[bool, List[str], List[str]]:
+        """Ensure essential models are available, download if missing."""
+        try:
+            # Get currently installed models
+            response = requests.get(f"{cls.OLLAMA_BASE_URL}/api/tags",
+                                  timeout=cls.OLLAMA_CONNECTION_TIMEOUT)
+            if response.status_code != 200:
+                return False, [], ["Cannot connect to Ollama service"]
+
+            data = response.json()
+            installed_models = [model['name'] for model in data.get('models', [])]
+
+            available_models = []
+            missing_models = []
+
+            # Check model hierarchy
+            for model in cls.MODEL_HIERARCHY:
+                if any(model in installed for installed in installed_models):
+                    available_models.append(model)
+                else:
+                    missing_models.append(model)
+
+            # Auto-download essential models if enabled
+            if cls.AUTO_DOWNLOAD_MODELS and missing_models:
+                print("Auto-downloading essential models...")
+                for model in cls.ESSENTIAL_MODELS:
+                    if model in missing_models:
+                        success = cls._download_model(model)
+                        if success:
+                            available_models.append(model)
+                            missing_models.remove(model)
+
+            return True, available_models, missing_models
+
+        except Exception as e:
+            return False, [], [f"Error checking models: {str(e)}"]
+
+    @classmethod
+    def _download_model(cls, model_name: str) -> bool:
+        """Download a model using Ollama."""
+        try:
+            print(f"Downloading {model_name}...")
+
+            # Use requests to trigger download
+            payload = {"name": model_name}
+            response = requests.post(f"{cls.OLLAMA_BASE_URL}/api/pull",
+                                   json=payload,
+                                   timeout=300,  # 5 minute timeout for downloads
+                                   stream=True)
+
+            if response.status_code == 200:
+                print(f"Successfully downloaded {model_name}")
+                return True
+            else:
+                print(f"Failed to download {model_name}: {response.status_code}")
+                return False
+
+        except Exception as e:
+            print(f"Error downloading {model_name}: {str(e)}")
             return False
+
+    @classmethod
+    def get_best_available_model(cls) -> Optional[str]:
+        """Get the best available model from the hierarchy."""
+        try:
+            success, available_models, _ = cls.ensure_models_available()
+            if success and available_models:
+                # Return first available model from hierarchy
+                for model in cls.MODEL_HIERARCHY:
+                    if model in available_models:
+                        return model
+            return None
+        except:
+            return None
+
+    @classmethod
+    def get_os_optimized_timeout(cls, base_timeout: int) -> int:
+        """Get OS-optimized timeout value."""
+        system_os = platform.system()
+        multiplier = cls.OS_TIMEOUT_MULTIPLIERS.get(system_os, 1.0)
+        return int(base_timeout * multiplier)
     
     @classmethod
     def get_timestamp(cls) -> str:
