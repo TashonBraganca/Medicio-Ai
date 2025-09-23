@@ -15,6 +15,10 @@ import logging
 
 from config import config
 from services.safety_guard import SafetyGuard
+from services.medical_safety import medical_safety
+from services.medical_knowledge import medical_knowledge
+from services.clinical_validation import clinical_validator
+from services.legal_compliance import legal_compliance
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -127,14 +131,79 @@ class MedicalChatService:
             response_data = self._call_ollama(messages)
             
             if response_data["success"]:
-                # Process response into structured format
-                structured_response = self._structure_response(response_data["response"])
-                
+                # CRITICAL MEDICAL SAFETY VALIDATION
+                is_safe, safe_response = medical_safety.validate_medical_response(
+                    user_message, response_data["response"]
+                )
+
+                if not is_safe:
+                    # Response blocked for safety - return safety message
+                    return {
+                        "success": True,
+                        "response": {"summary": safe_response, "safety_blocked": True},
+                        "safety_intervention": True,
+                        "timestamp": datetime.now().isoformat()
+                    }
+
+                # MEDICAL KNOWLEDGE ENHANCEMENT
+                knowledge_enhancement = medical_knowledge.enhance_medical_response(
+                    user_message, safe_response
+                )
+
+                # Use enhanced response with medical validation
+                final_response = knowledge_enhancement["enhanced_response"]
+
+                # CLINICAL VALIDATION AND OVERSIGHT
+                clinical_validation = clinical_validator.validate_clinical_response(
+                    user_message, final_response
+                )
+
+                # Process enhanced response into structured format
+                structured_response = self._structure_response(final_response)
+
+                # Add medical enhancement metadata
+                structured_response["medical_accuracy_score"] = knowledge_enhancement.get("accuracy_score", 0.7)
+                structured_response["specialist_referral"] = knowledge_enhancement.get("specialist_referral")
+                structured_response["clinical_context"] = knowledge_enhancement.get("clinical_context")
+
+                # Add clinical validation metadata
+                structured_response["clinical_validation_level"] = clinical_validation.validation_level.value
+                structured_response["clinical_accuracy_score"] = clinical_validation.clinical_accuracy_score
+                structured_response["evidence_quality"] = clinical_validation.evidence_quality
+                structured_response["clinical_notes"] = clinical_validation.clinical_notes
+                structured_response["contraindications"] = clinical_validation.contraindications
+                structured_response["liability_risk"] = clinical_validation.liability_risk
+
+                # LEGAL COMPLIANCE AND LIABILITY PROTECTION
+                safety_dict = {
+                    "safety_level": response_data.get("safety_level", "safe"),
+                    "emergency_detected": bool(red_flags),
+                    "urgent_detected": False,
+                    "blocked_response": False
+                }
+
+                clinical_dict = {
+                    "validation_level": clinical_validation.validation_level.value,
+                    "clinical_accuracy_score": clinical_validation.clinical_accuracy_score
+                }
+
+                compliance_record = legal_compliance.assess_legal_compliance(
+                    user_message, final_response, safety_dict, clinical_dict
+                )
+
+                # Add legal compliance metadata
+                structured_response["compliance_level"] = compliance_record.compliance_level.value
+                structured_response["legal_liability_risk"] = compliance_record.liability_risk.value
+                structured_response["disclaimers_present"] = compliance_record.disclaimers_present
+                structured_response["professional_supervision_required"] = compliance_record.professional_supervision
+                structured_response["legal_recommendations"] = compliance_record.legal_recommendations
+                structured_response["compliance_record_id"] = compliance_record.record_id
+
                 # Add red-flag warnings if detected
                 if red_flags:
                     structured_response["red_flags"] = red_flags
                     structured_response["urgent_warning"] = True
-                
+
                 return {
                     "success": True,
                     "response": structured_response,
@@ -153,17 +222,29 @@ class MedicalChatService:
             }
     
     def get_streaming_response(self, user_message: str, chat_history: Optional[List[Dict]] = None) -> Generator[str, None, None]:
-        """Get streaming medical response from Ollama."""
+        """Get streaming medical response from Ollama with critical safety validation."""
         try:
+            # CRITICAL: Emergency safety check FIRST
+            safety_analysis = medical_safety.analyze_medical_safety(user_message, "")
+
+            if safety_analysis["emergency_detected"]:
+                # EMERGENCY: Block streaming and show immediate safety message
+                yield medical_safety.critical_disclaimer
+                return
+
+            if safety_analysis["urgent_detected"]:
+                # URGENT: Show warning but allow response with disclaimer
+                yield medical_safety.urgent_disclaimer + "\n\n---\n\n"
+
             # Check if query is medical
             if not self._is_medical_query(user_message):
                 yield "I can help with medical and health-related questions. Please try rephrasing your question with medical context, symptoms, conditions, or health concerns."
                 return
-            
-            # Check for red-flag symptoms first
+
+            # Check for red-flag symptoms (legacy support)
             red_flags = self._detect_red_flags(user_message)
-            if red_flags:
-                yield "🚨 **URGENT:** Based on your symptoms, you should seek immediate medical attention. Call emergency services or go to the nearest emergency room.\n\n"
+            if red_flags and not safety_analysis["emergency_detected"]:
+                yield "⚠️ **IMPORTANT:** Based on your symptoms, consider consulting a healthcare provider promptly.\n\n"
             
             # Prepare messages for Ollama
             messages = self._prepare_messages(user_message, chat_history)
@@ -191,14 +272,22 @@ class MedicalChatService:
             )
             
             if response.status_code == 200:
+                response_text = ""
                 for line in response.iter_lines():
                     if line:
                         try:
                             chunk = json.loads(line)
                             if 'message' in chunk and 'content' in chunk['message']:
-                                yield chunk['message']['content']
+                                content = chunk['message']['content']
+                                response_text += content
+                                yield content
                         except json.JSONDecodeError:
                             continue
+
+                # CRITICAL: Add medical disclaimer at end of streaming response
+                if response_text.strip():
+                    disclaimer = "\n\n---\n\n" + medical_safety.general_disclaimer
+                    yield disclaimer
             else:
                 yield f"Error: Ollama service returned status code {response.status_code}"
                 
