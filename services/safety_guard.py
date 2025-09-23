@@ -164,14 +164,43 @@ class SafetyGuard:
         return detected_flags
     
     def is_medical_query(self, message: str) -> Dict[str, any]:
-        """Determine if query is medical/health-related with enhanced sensitivity."""
+        """Determine if query is medical/health-related with context awareness."""
         message_lower = message.lower()
-        
+
+        # Check for educational/identification contexts first
+        educational_patterns = [
+            "what is", "what are", "identify", "identification", "what kind", "what type",
+            "species", "looks like", "appears to be", "could be", "might be",
+            "picture of", "image of", "photo of", "seen a", "found a", "spotted",
+            "educational", "learning", "curious about", "brown snake with", "black spots"
+        ]
+
+        is_educational = any(pattern in message_lower for pattern in educational_patterns)
+
+        # Check for actual medical emergency contexts
+        emergency_indicators = [
+            "bit me", "bitten by", "bite", "attacked", "struck", "hurt", "pain",
+            "swelling", "bleeding", "can't breathe", "difficulty breathing",
+            "feel sick", "nausea", "emergency", "help", "urgent", "poisoned"
+        ]
+
+        has_emergency_context = any(indicator in message_lower for indicator in emergency_indicators)
+
+        # If educational query about animals without emergency context, not medical
+        if is_educational and "snake" in message_lower and not has_emergency_context:
+            return {
+                "is_medical": False,
+                "confidence": 0.1,
+                "reason": "Educational animal identification query",
+                "medical_indicators": 0,
+                "context": "educational"
+            }
+
         # Enhanced medical detection with multiple approaches
-        
+
         # 1. Direct keyword matching (more lenient)
         medical_word_count = sum(1 for keyword in self.medical_keywords if keyword in message_lower)
-        
+
         # 2. Phrase-based detection for common medical scenarios
         medical_phrases = [
             'snake bite', 'animal bite', 'insect bite', 'bee sting', 'spider bite',
@@ -180,7 +209,7 @@ class SafetyGuard:
             'rash', 'swelling', 'bleeding', 'infection', 'burn', 'scratch'
         ]
         phrase_matches = sum(1 for phrase in medical_phrases if phrase in message_lower)
-        
+
         # 3. Medical context patterns (body parts + action/condition)
         body_parts = ['head', 'arm', 'leg', 'hand', 'foot', 'chest', 'back', 'neck', 'stomach', 'eye', 'ear']
         action_words = ['hurt', 'pain', 'ache', 'sore', 'injured', 'swollen', 'bleeding']

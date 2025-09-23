@@ -26,8 +26,19 @@ except ImportError as e:
     SERVICES_AVAILABLE = False
     st.error(f"Services not available: {e}")
 
-# Auto-start Ollama service
-config.start_ollama_service()
+# Initialize persistent Ollama manager (only once)
+if 'ollama_manager' not in st.session_state:
+    from services.ollama_manager import ollama_manager
+    st.session_state.ollama_manager = ollama_manager
+
+    # Start persistent server if not running
+    if not ollama_manager.startup_complete:
+        with st.spinner("Starting AI server... (one-time setup)"):
+            success, message = ollama_manager.start_persistent_server()
+            if success:
+                st.success("🚀 AI server ready for fast responses!")
+            else:
+                st.error(f"Failed to start AI server: {message}")
 
 # Initialize services
 if SERVICES_AVAILABLE:

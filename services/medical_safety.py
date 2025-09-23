@@ -157,12 +157,42 @@ This AI provides general health information only and is NOT a substitute for pro
         return safety_analysis
 
     def _detect_emergency_symptoms(self, text: str) -> Optional[str]:
-        """Detect life-threatening emergency symptoms"""
+        """Detect life-threatening emergency symptoms with context awareness"""
         text_lower = text.lower()
+
+        # Check for non-emergency contexts first
+        educational_patterns = [
+            "what is", "what are", "identify", "identification", "brown snake with",
+            "type of snake", "species", "what kind", "looks like", "appears to be",
+            "could be", "might be", "picture of", "image of", "photo of", "seen a",
+            "found a", "spotted", "educational", "learning", "curious about"
+        ]
+
+        # If this appears to be educational/identification request, don't treat as emergency
+        if any(pattern in text_lower for pattern in educational_patterns):
+            # Extra check for snake bite context
+            bite_indicators = ["bite", "bitten", "bit me", "bit by", "attacked", "struck"]
+            if not any(indicator in text_lower for indicator in bite_indicators):
+                logger.info("Educational/identification query detected - not emergency")
+                return None
+
+        # Check for actual bite or medical emergency context
+        emergency_contexts = [
+            "bit me", "bitten by", "bite", "attacked", "struck", "hurt", "pain",
+            "swelling", "bleeding", "can't breathe", "difficulty breathing",
+            "feel sick", "nausea", "emergency", "help", "urgent"
+        ]
+
+        has_emergency_context = any(context in text_lower for context in emergency_contexts)
 
         for category, symptoms in self.emergency_symptoms.items():
             for symptom in symptoms:
                 if symptom in text_lower:
+                    # For snake-related queries, require emergency context
+                    if "snake" in text_lower and not has_emergency_context:
+                        logger.info(f"Snake mentioned but no emergency context: {symptom}")
+                        continue
+
                     logger.critical(f"EMERGENCY SYMPTOM DETECTED: {symptom} (Category: {category})")
                     return category
         return None
