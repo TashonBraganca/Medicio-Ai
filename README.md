@@ -57,29 +57,122 @@ This app is optimized for **Streamlit Community Cloud** deployment with:
 ## 🏗️ Local Development Setup
 
 ### **Prerequisites**
-- Python 3.8+
-- 8GB RAM minimum (16GB recommended)
+- **Python 3.8+** ([Download here](https://www.python.org/downloads/))
+- **8GB RAM minimum** (16GB recommended)
+- **Ollama** for AI models ([Installation guide below](#ollama-installation))
 
-### **Quick Start**
+### **Step-by-Step Installation**
 
-1. **Clone the repository**
-   ```bash
-   git clone https://github.com/TashonBraganca/Medicio-Ai.git
-   cd Medicio-Ai
-   ```
+#### 1️⃣ Install Ollama (AI Engine)
 
-2. **Install dependencies**
-   ```bash
-   pip install -r requirements.txt
-   ```
+**Windows:**
+```bash
+# Download and run the installer
+# Visit: https://ollama.com/download/windows
+# Or use winget
+winget install Ollama.Ollama
+```
 
-3. **Run the application**
-   ```bash
-   streamlit run app.py
-   ```
+**macOS:**
+```bash
+# Install via Homebrew
+brew install ollama
 
-4. **Access the app**
-   - Open your browser to `http://localhost:8501`
+# Or download from https://ollama.com/download/mac
+```
+
+**Linux:**
+```bash
+# Install via curl
+curl -fsSL https://ollama.com/install.sh | sh
+```
+
+#### 2️⃣ Install AI Models
+
+After installing Ollama, open a new terminal and run:
+
+```bash
+# Install primary model (1.6 GB)
+ollama pull gemma2:2b
+
+# Install fallback model (934 MB)
+ollama pull qwen2:1.5b
+
+# Install vision model for image analysis (4.7 GB)
+ollama pull llava:7b
+```
+
+**Note**: Models will download in the background. This may take 5-15 minutes depending on your internet speed.
+
+#### 3️⃣ Clone & Setup Application
+
+```bash
+# Clone the repository
+git clone https://github.com/TashonBraganca/Medicio-Ai.git
+cd Medicio-Ai
+
+# Install Python dependencies
+pip install -r requirements.txt
+```
+
+#### 4️⃣ (Optional) Install Tesseract OCR
+
+For document scanning capabilities:
+
+**Windows:**
+```bash
+# Download installer from:
+# https://github.com/UB-Mannheim/tesseract/wiki
+# Install and add to PATH
+```
+
+**macOS:**
+```bash
+brew install tesseract
+```
+
+**Linux:**
+```bash
+sudo apt-get install tesseract-ocr
+```
+
+#### 5️⃣ Run the Application
+
+```bash
+# Start the app
+streamlit run app.py
+```
+
+The app will automatically open in your browser at `http://localhost:8501`
+
+### **Verify Installation**
+
+Check that everything is working:
+
+```bash
+# Check Ollama is running
+ollama list
+
+# Expected output:
+# NAME            ID          SIZE    MODIFIED
+# gemma2:2b       ...         1.6 GB  ...
+# qwen2:1.5b      ...         934 MB  ...
+# llava:7b        ...         4.7 GB  ...
+```
+
+### **Troubleshooting**
+
+**Issue: "Ollama not found"**
+- Restart your terminal after installing Ollama
+- Verify Ollama is in your PATH: `which ollama` (Mac/Linux) or `where ollama` (Windows)
+
+**Issue: "Model not found"**
+- Ensure models are downloaded: `ollama list`
+- Re-pull model if needed: `ollama pull gemma2:2b`
+
+**Issue: "Port already in use"**
+- The app will try alternate ports automatically
+- Or manually specify: `streamlit run app.py --server.port 8502`
 
 ---
 
