@@ -65,6 +65,10 @@ def initialize_session_state():
         st.session_state.user_name = "User"
     if 'processing_message' not in st.session_state:
         st.session_state.processing_message = False
+    if 'selected_model' not in st.session_state:
+        st.session_state.selected_model = config.DEFAULT_LLM_MODEL
+    if 'model_search_query' not in st.session_state:
+        st.session_state.model_search_query = ""
 
 def check_ollama_status():
     """Check if Ollama service is running."""
@@ -100,9 +104,15 @@ def render_sidebar():
         ollama_running, models_data = check_ollama_status()
         if ollama_running:
             st.success("✅ System Online")
+
+            # Show active model
+            if SERVICES_AVAILABLE and chat_service:
+                active_model = chat_service.model
+                st.info(f"🤖 Active: {active_model}")
+
             if models_data and 'models' in models_data:
                 model_count = len(models_data['models'])
-                st.info(f"📦 {model_count} AI models loaded")
+                st.caption(f"📦 {model_count} models available")
 
                 # Show speed optimization status
                 models = [model['name'] for model in models_data['models']]
@@ -133,15 +143,92 @@ def render_sidebar():
             """)
 
         with st.expander("⚙️ Settings", expanded=False):
-            # Model selection
+            # Enhanced Model Selection with Search
+            st.markdown("#### 🤖 AI Model Selection")
+
+            # Search input
+            search_query = st.text_input(
+                "🔍 Search Models",
+                value=st.session_state.model_search_query,
+                placeholder="Type to filter models...",
+                key="model_search_input",
+                help="Search for models by name"
+            )
+            st.session_state.model_search_query = search_query
+
+            # Get all models with details
             if models_data and 'models' in models_data:
-                available_models = [model['name'] for model in models_data['models']]
-                selected_model = st.selectbox(
-                    "AI Model",
-                    options=available_models,
-                    index=0 if available_models else 0,
-                    help="Select which AI model to use"
-                )
+                all_models = models_data['models']
+
+                # Filter models based on search
+                if search_query.strip():
+                    filtered_models = [
+                        m for m in all_models
+                        if search_query.lower() in m['name'].lower()
+                    ]
+                else:
+                    filtered_models = all_models
+
+                if filtered_models:
+                    # Display filtered models count
+                    st.caption(f"Found {len(filtered_models)} model(s)")
+
+                    # Radio buttons for selection
+                    model_names = [m['name'] for m in filtered_models]
+
+                    # Get current index
+                    current_index = 0
+                    if st.session_state.selected_model in model_names:
+                        current_index = model_names.index(st.session_state.selected_model)
+
+                    selected_model = st.radio(
+                        "Select Model:",
+                        options=model_names,
+                        index=current_index,
+                        key="model_radio"
+                    )
+
+                    # Show model details
+                    selected_model_data = next((m for m in filtered_models if m['name'] == selected_model), None)
+                    if selected_model_data:
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            # Convert size to GB/MB
+                            size_bytes = selected_model_data.get('size', 0)
+                            size_gb = size_bytes / (1024**3)
+                            if size_gb >= 1:
+                                st.caption(f"📦 {size_gb:.2f} GB")
+                            else:
+                                size_mb = size_bytes / (1024**2)
+                                st.caption(f"📦 {size_mb:.0f} MB")
+
+                        with col2:
+                            # Show modified date (simplified)
+                            st.caption(f"🕐 Available")
+
+                    # Apply button
+                    current_active = chat_service.model if SERVICES_AVAILABLE else config.DEFAULT_LLM_MODEL
+
+                    if selected_model != current_active:
+                        if st.button("✅ Apply Model", use_container_width=True, type="primary", key="apply_model_btn"):
+                            if SERVICES_AVAILABLE:
+                                # Update chat service model
+                                chat_service.model = selected_model
+                                st.session_state.selected_model = selected_model
+                                st.success(f"✅ Switched to {selected_model}")
+                                time.sleep(0.5)  # Brief delay for user to see message
+                                st.rerun()
+                            else:
+                                st.error("Services not available")
+                    else:
+                        st.info(f"✓ Active: {selected_model}")
+
+                else:
+                    st.warning(f"No models matching '{search_query}'")
+            else:
+                st.error("No models available")
+
+            st.markdown("---")
 
             # Temperature setting
             temperature = st.slider(

@@ -202,6 +202,8 @@ ollama list
 - 📋 **Structured output** with medical formatting
 
 ### **Key UI Features**
+- **Searchable model selection** - Find and switch between AI models instantly
+- **Active model indicator** - Real-time display of current model in use
 - **Sidebar toggle** for space optimization
 - **Auto-scroll chat** for seamless conversation
 - **File upload** with drag-and-drop support
