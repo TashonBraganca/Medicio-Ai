@@ -110,10 +110,8 @@ def render_sidebar():
                     st.success("⚡ Ultra-Fast Mode Active (gemma2:2b)")
                 elif any('qwen2:1.5b' in model for model in models):
                     st.success("🚀 Lightning Mode Active (qwen2:1.5b)")
-                elif any('phi3:mini' in model for model in models):
-                    st.info("🔥 Fast Mode Active (phi3:mini)")
                 else:
-                    st.warning("🐢 Standard Mode")
+                    st.warning("⚠️ Optimized models not detected")
         else:
             st.error("❌ System Offline")
 

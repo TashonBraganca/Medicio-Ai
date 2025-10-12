@@ -44,15 +44,11 @@ class MediLensConfig:
         'Linux': 1.2
     }
 
-    # Universal Model Strategy - Cross-Platform Compatible
-    # Model hierarchy for maximum compatibility
+    # Essential Model Configuration - Optimized for Speed & Quality
+    # Only necessary models for production use
     MODEL_HIERARCHY = [
         "gemma2:2b",     # Primary - fast and accurate
         "qwen2:1.5b",    # Fast fallback
-        "gemma:2b",      # Alternative naming
-        "phi3:mini",     # Widely available fallback
-        "tinyllama",     # Lightweight option
-        "llama2:7b",     # Common fallback
     ]
 
     DEFAULT_LLM_MODEL = "gemma2:2b"  # Will auto-fallback if not available
@@ -61,9 +57,9 @@ class MediLensConfig:
 
     # Auto-download models if missing
     AUTO_DOWNLOAD_MODELS = True
-    ESSENTIAL_MODELS = ["gemma2:2b", "qwen2:1.5b"]  # Models to auto-download
-    
-    # PHI3:MINI ULTRA-FAST Parameters (25-30 second responses)
+    ESSENTIAL_MODELS = ["gemma2:2b", "qwen2:1.5b", "llava:7b"]  # All required models
+
+    # GEMMA2:2B ULTRA-FAST Parameters (25-35 second responses)
     DEFAULT_TEMPERATURE = 0.1   # Ultra-low temperature for fast, focused responses
     DEFAULT_MAX_TOKENS = 300     # Complete responses without cutoffs
     CHAT_TEMPERATURE = 0.1       # Ultra-low temperature for fast medical responses
@@ -171,7 +167,7 @@ class MediLensConfig:
     
     @classmethod
     def get_available_models(cls) -> List[str]:
-        """Get list of available models - PHI3:MINI ONLY."""
+        """Get list of available models."""
         return [cls.DEFAULT_LLM_MODEL]
     
     @classmethod

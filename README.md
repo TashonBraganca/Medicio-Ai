@@ -93,8 +93,8 @@ This app is optimized for **Streamlit Community Cloud** deployment with:
 | **LLaVA:7b** | Image Analysis | 7B params | ⚡⚡⚡ | ⭐⭐⭐⭐⭐ |
 
 ### **Performance Optimizations**
-- 🚀 **33-second average** response time (vs 60+ seconds with phi3:mini)
-- ⚡ **Auto-model switching** with intelligent fallbacks
+- 🚀 **25-35 second average** response time with ultra-fast models
+- ⚡ **Auto-model switching** between Gemma2:2b and Qwen2:1.5b
 - 🎯 **Optimized prompts** for medical accuracy
 - 📊 **Structured responses** with 7 standardized sections
 
