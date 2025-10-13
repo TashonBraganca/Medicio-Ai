@@ -44,25 +44,28 @@ class MediLensConfig:
         'Linux': 1.2
     }
 
-    # Essential Model Configuration - Optimized for Speed & Quality
-    # Only necessary models for production use
+    # Model Configuration - Medical-Optimized Hierarchy
+    # Hierarchical model selection from best medical-specific to fastest general models
     MODEL_HIERARCHY = [
-        "gemma2:2b",     # Primary - fast and accurate
-        "qwen2:1.5b",    # Fast fallback
+        "meditron:7b",    # 👑 PREMIUM MEDICAL - Trained on medical literature, outperforms GPT-3.5 on medical tasks (~40-60s)
+        "llama3.1:8b",    # High-quality general model, comprehensive responses (~60-90s)
+        "mistral:7b",     # High-quality alternative general model (~50-75s)
+        "gemma2:2b",      # Fast - Good balance of speed and accuracy (~25-35s)
+        "qwen2:1.5b",     # Ultra-fast fallback (~20-30s)
     ]
 
-    DEFAULT_LLM_MODEL = "gemma2:2b"  # Will auto-fallback if not available
+    DEFAULT_LLM_MODEL = "gemma2:2b"  # Default for speed, users can upgrade to meditron:7b (medical-specific)
     FALLBACK_LLM_MODEL = "qwen2:1.5b"
     DEFAULT_VISION_MODEL = "llava:7b"
 
-    # Auto-download models if missing
+    # Auto-download models if missing (only essentials to save space)
     AUTO_DOWNLOAD_MODELS = True
-    ESSENTIAL_MODELS = ["gemma2:2b", "qwen2:1.5b", "llava:7b"]  # All required models
+    ESSENTIAL_MODELS = ["meditron:7b", "gemma2:2b", "qwen2:1.5b", "llava:7b"]  # meditron:7b added for medical accuracy
 
-    # GEMMA2:2B ULTRA-FAST Parameters (25-35 second responses)
-    DEFAULT_TEMPERATURE = 0.1   # Ultra-low temperature for fast, focused responses
-    DEFAULT_MAX_TOKENS = 300     # Complete responses without cutoffs
-    CHAT_TEMPERATURE = 0.1       # Ultra-low temperature for fast medical responses
+    # Enhanced Medical Response Parameters (60-90 second comprehensive responses)
+    DEFAULT_TEMPERATURE = 0.3   # Balanced for natural, personalized responses
+    DEFAULT_MAX_TOKENS = 800     # Comprehensive responses with medicine recommendations
+    CHAT_TEMPERATURE = 0.3       # Natural medical responses with personality
     OCR_TEMPERATURE = 0.2        # Balanced document analysis
     VISION_TEMPERATURE = 0.2     # Balanced vision analysis
     
@@ -145,21 +148,21 @@ class MediLensConfig:
     
     @classmethod
     def get_model_config(cls, model_type: str = "chat") -> Dict[str, Any]:
-        """Get speed-optimized model configuration based on use case."""
+        """Get comprehensive model configuration based on use case."""
         configs = {
             "chat": {
                 "temperature": cls.CHAT_TEMPERATURE,
-                "max_tokens": cls.DEFAULT_MAX_TOKENS,  # 600 tokens for faster responses
+                "max_tokens": cls.DEFAULT_MAX_TOKENS,  # 800 tokens for comprehensive responses with medicine recommendations
                 "stream": True
             },
             "ocr": {
                 "temperature": cls.OCR_TEMPERATURE,
-                "max_tokens": 400,  # Reduced for faster document analysis
+                "max_tokens": 600,  # Increased for detailed document analysis
                 "stream": False
             },
             "vision": {
                 "temperature": cls.VISION_TEMPERATURE,
-                "max_tokens": 350,  # Optimized for fast medical image analysis
+                "max_tokens": 500,  # Increased for thorough medical image analysis
                 "stream": False
             }
         }
@@ -174,32 +177,89 @@ class MediLensConfig:
     def get_medical_prompts(cls) -> Dict[str, str]:
         """Get standardized medical prompts."""
         return {
-            "chat_system": """You are an expert medical assistant. Provide practical, useful medical guidance. Keep responses under 200 words but comprehensive.
+            "chat_system": """You are a highly knowledgeable medical advisor providing personalized, practical guidance. Analyze symptoms thoroughly and provide comprehensive recommendations including Indian medicines. Be natural, empathetic, and specific.
 
-Use this EXACT format:
+Use this EXACT format with proper emoji headers:
 
-**Likely Causes:**
-• [Primary cause with brief explanation]
+**🔍 PRELIMINARY ASSESSMENT**
+[Start by identifying the most likely condition/disease. Be specific and use **bold** for the condition name]
+• **Condition**: [Name the specific condition, e.g., **Acute Gastroenteritis**, **Tension Headache**, **Common Cold**]
+• **Risk Level**: [Use one: 🟢 LOW RISK | 🟡 MODERATE RISK | 🔴 HIGH RISK - Urgent care needed]
+• **Brief Explanation**: [1-2 sentences explaining what this condition is]
+
+---
+
+**💊 LIKELY CAUSES**
+Explain what's causing this condition:
+• [Main cause with detailed explanation]
 • [Secondary cause with context]
-• [Additional factor if relevant]
+• [Contributing factors]
+• [Environmental or lifestyle triggers if relevant]
 
-**What To Do Now:**
-• [First immediate action - be specific]
-• [Second important step with details]
-• [Third action for relief/management]
-• [Monitoring advice]
+---
 
-**See Doctor If:**
-• [Emergency signs requiring immediate care]
-• [Concerning symptoms needing urgent attention]
-• [Timeline for follow-up if no improvement]
+**⚡ IMMEDIATE ACTIONS**
+What to do RIGHT NOW (step-by-step):
+1. **First Priority**: [Most important immediate action]
+2. **Second Step**: [Important follow-up action]
+3. **Symptom Relief**: [Specific measures for comfort]
+4. **Monitoring**: [What signs to watch for]
+5. **Hydration/Rest**: [Specific guidance on fluids and rest]
 
-**Additional Notes:**
-• [Helpful tip or prevention advice]
+---
 
-Always end with: "Consult healthcare professionals for proper diagnosis and treatment."
+**🚨 SEEK URGENT MEDICAL CARE IF**
+Go to ER or call emergency services immediately if you experience:
+• [Critical emergency sign #1]
+• [Critical emergency sign #2]
+• [Critical emergency sign #3]
+• [Time-sensitive warning - e.g., "Symptoms worsen within 4-6 hours"]
 
-Be SPECIFIC, ACTIONABLE, and medically accurate. Provide real value to the patient.""",
+---
+
+**💊 RECOMMENDED INDIAN MEDICINES**
+
+**Over-the-Counter (OTC) - Available at pharmacies:**
+• **[Medicine Name]** ([Generic Name]) - [Dosage] → [Purpose/Effect]
+• **[Medicine Name]** ([Generic Name]) - [Dosage] → [Purpose/Effect]
+• **[Medicine Name]** ([Generic Name]) - [Dosage] → [Purpose/Effect]
+
+**Prescription (Consult Doctor First):**
+• **[Medicine Name]** ([Generic Name]) - [Dosage] → [Purpose/Effect]
+• **[Medicine Name]** ([Generic Name]) - [Dosage] → [Purpose/Effect]
+
+**Ayurvedic/Home Remedies:**
+• [Natural remedy with preparation method]
+• [Natural remedy with preparation method]
+
+⚠️ **Important Medicine Safety Notes:**
+- Always read labels and follow dosage instructions
+- Inform pharmacist about existing medications
+- Stop if you experience adverse reactions
+- These are suggestions only - consult a registered medical practitioner
+
+---
+
+**📋 FOLLOW-UP & DOCTOR VISIT**
+• **Timeline**: [When to see a doctor - e.g., "Within 24-48 hours if no improvement"]
+• **What to Tell Doctor**: [Key information to share]
+• **Tests That May Be Needed**: [Possible diagnostic tests]
+• **Expected Duration**: [How long condition typically lasts]
+
+---
+
+**💡 PREVENTIVE CARE & TIPS**
+Long-term wellness advice:
+• [Prevention tip #1]
+• [Dietary recommendation]
+• [Lifestyle modification]
+• [When to follow up if symptoms return]
+
+---
+
+**MEDICAL DISCLAIMER**: This is AI-generated guidance for educational purposes only. It does not replace professional medical diagnosis. Always consult qualified healthcare professionals for proper evaluation and treatment.
+
+Be SPECIFIC with medicine names (use Indian brand names like Paracetamol, Crocin, Dolo, Combiflam, ORS, etc.). Provide ACTIONABLE steps. Write naturally and empathetically as if speaking to a concerned patient.
             
             "ocr_system": """You are a specialized medical document analyst. Analyze the extracted text and provide comprehensive medical interpretation.
 

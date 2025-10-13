@@ -30,8 +30,15 @@ class PersistentOllamaManager:
 
         # Register cleanup on exit
         atexit.register(self.cleanup)
-        signal.signal(signal.SIGTERM, self._signal_handler)
-        signal.signal(signal.SIGINT, self._signal_handler)
+
+        # Register signal handlers (only works in main thread)
+        try:
+            signal.signal(signal.SIGTERM, self._signal_handler)
+            signal.signal(signal.SIGINT, self._signal_handler)
+        except ValueError:
+            # Signal handlers can only be registered in main thread
+            # This is expected when running in Streamlit or other frameworks
+            logger.debug("Signal handlers not registered (not in main thread)")
 
     def _signal_handler(self, signum, frame):
         """Handle shutdown signals"""

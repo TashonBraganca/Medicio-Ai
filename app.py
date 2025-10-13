@@ -114,14 +114,20 @@ def render_sidebar():
                 model_count = len(models_data['models'])
                 st.caption(f"📦 {model_count} models available")
 
-                # Show speed optimization status
+                # Show model optimization status - prioritize medical-specific models
                 models = [model['name'] for model in models_data['models']]
-                if any('gemma2:2b' in model for model in models):
-                    st.success("⚡ Ultra-Fast Mode Active (gemma2:2b)")
+                if any('meditron:7b' in model for model in models):
+                    st.success("👑 MEDICAL EXPERT Mode (meditron:7b - Trained on medical literature)")
+                elif any('llama3.1:8b' in model for model in models):
+                    st.success("⭐ Premium Mode Available (llama3.1:8b)")
+                elif any('mistral:7b' in model for model in models):
+                    st.success("⭐ High-Quality Mode Available (mistral:7b)")
+                elif any('gemma2:2b' in model for model in models):
+                    st.success("⚡ Fast Mode Active (gemma2:2b)")
                 elif any('qwen2:1.5b' in model for model in models):
-                    st.success("🚀 Lightning Mode Active (qwen2:1.5b)")
+                    st.success("🚀 Ultra-Fast Mode (qwen2:1.5b)")
                 else:
-                    st.warning("⚠️ Optimized models not detected")
+                    st.warning("⚠️ Recommended models not detected")
         else:
             st.error("❌ System Offline")
 
@@ -553,34 +559,34 @@ def load_css():
         color: #fecaca !important;
     }
 
-    /* PROPERLY POSITIONED SIDEBAR TOGGLE BUTTON */
+    /* PROPERLY POSITIONED SIDEBAR TOGGLE BUTTON - ALWAYS VISIBLE */
     .sidebar-toggle {
         position: fixed !important;
         top: 15px !important;
         left: 15px !important;
         z-index: 99999 !important;
-        background: rgba(30, 41, 59, 0.9) !important;
+        background: rgba(30, 41, 59, 0.95) !important;
         color: white !important;
-        border: 1px solid #475569 !important;
+        border: 2px solid #3b82f6 !important;
         border-radius: 8px !important;
         padding: 8px 12px !important;
         cursor: pointer !important;
-        font-size: 16px !important;
+        font-size: 18px !important;
         font-weight: bold !important;
         transition: all 0.3s ease !important;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.4) !important;
-        min-width: 40px !important;
-        min-height: 36px !important;
-        display: none !important;
-        visibility: hidden !important;
-        opacity: 0 !important;
-    }
-
-    /* Show toggle button when sidebar is hidden */
-    .sidebar-toggle.show {
+        box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4) !important;
+        min-width: 44px !important;
+        min-height: 40px !important;
         display: block !important;
         visibility: visible !important;
         opacity: 1 !important;
+    }
+
+    /* Enhanced visibility when sidebar is hidden */
+    .sidebar-toggle.sidebar-hidden {
+        background: rgba(59, 130, 246, 0.95) !important;
+        border-color: #60a5fa !important;
+        box-shadow: 0 6px 16px rgba(59, 130, 246, 0.6) !important;
     }
 
     .sidebar-toggle:hover {
@@ -708,28 +714,20 @@ def process_user_message(user_message):
         st.session_state.chat_history.append({"role": "assistant", "content": error_response})
 
 def format_medical_response(response_dict):
-    """Format structured medical response for display with proper formatting."""
+    """Format structured medical response for display - Enhanced prompt handles formatting."""
     if not isinstance(response_dict, dict):
         return str(response_dict)
 
-    # Get the full response from summary
+    # Get the full response from summary (already formatted by enhanced prompt)
     summary = response_dict.get("summary", "")
 
     if summary:
-        # Clean up the response to ensure proper formatting
+        # The new prompt includes proper formatting with emojis, sections, and structure
+        # Just ensure clean line breaks and return
         formatted_response = summary
 
-        # Ensure proper line breaks after sections
-        formatted_response = formatted_response.replace("**Likely Causes:**", "\n**🔍 Likely Causes:**\n")
-        formatted_response = formatted_response.replace("**What To Do Now:**", "\n\n**⚡ What To Do Now:**\n")
-        formatted_response = formatted_response.replace("**See Doctor If:**", "\n\n**🚨 See Doctor If:**\n")
-        formatted_response = formatted_response.replace("**Additional Notes:**", "\n\n**💡 Additional Notes:**\n")
-
-        # Ensure bullet points are properly formatted with line breaks
-        formatted_response = formatted_response.replace("• **", "\n• **")
-        formatted_response = formatted_response.replace("• ", "\n• ")
-
-        # Clean up any double line breaks
+        # Clean up excessive line breaks
+        formatted_response = formatted_response.replace("\n\n\n\n", "\n\n")
         formatted_response = formatted_response.replace("\n\n\n", "\n\n")
         formatted_response = formatted_response.strip()
 
@@ -756,38 +754,81 @@ def render_chat_page():
 
     st.markdown('</div>', unsafe_allow_html=True)
 
-    # Auto-scroll JavaScript - executes after chat content is rendered
+    # Enhanced Auto-scroll JavaScript - Works with Streamlit rerun
     if st.session_state.chat_history:
-        st.markdown("""
+        # Get last message indicator for scroll targeting
+        last_msg_id = len(st.session_state.chat_history) - 1
+        st.markdown(f"""
+        <div id="scroll-anchor-{last_msg_id}" style="height: 1px;"></div>
         <script>
-        // ChatGPT-style auto-scroll to latest message
-        function scrollToBottom() {
+        // Ultra-aggressive scroll to bottom - works after Streamlit rerun
+        function scrollToBottom() {{
+            // Method 1: Scroll chat container
             const chatContainer = document.getElementById('chat-container');
-            if (chatContainer) {
+            if (chatContainer) {{
                 chatContainer.scrollTop = chatContainer.scrollHeight;
-            }
-        }
+                chatContainer.scrollTo({{
+                    top: chatContainer.scrollHeight,
+                    behavior: 'smooth'
+                }});
+            }}
 
-        // Wait for content to load, then scroll
+            // Method 2: Scroll to anchor element
+            const scrollAnchor = document.getElementById('scroll-anchor-{last_msg_id}');
+            if (scrollAnchor) {{
+                scrollAnchor.scrollIntoView({{ behavior: 'smooth', block: 'end' }});
+            }}
+
+            // Method 3: Scroll window to bottom
+            window.scrollTo({{
+                top: document.documentElement.scrollHeight,
+                behavior: 'smooth'
+            }});
+        }}
+
+        // Immediate execution
+        scrollToBottom();
+
+        // Multiple timed executions to catch Streamlit rerun
         setTimeout(scrollToBottom, 100);
+        setTimeout(scrollToBottom, 300);
+        setTimeout(scrollToBottom, 500);
+        setTimeout(scrollToBottom, 1000);
 
-        // Also scroll on page load and content changes
+        // Event-based execution
         window.addEventListener('load', scrollToBottom);
         document.addEventListener('DOMContentLoaded', scrollToBottom);
 
-        // Observe for new messages and auto-scroll
-        const observer = new MutationObserver(function(mutations) {
-            mutations.forEach(function(mutation) {
-                if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
-                    setTimeout(scrollToBottom, 50);
-                }
-            });
-        });
+        // Observe for DOM changes and scroll
+        const observer = new MutationObserver(function(mutations) {{
+            let shouldScroll = false;
+            mutations.forEach(function(mutation) {{
+                if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {{
+                    shouldScroll = true;
+                }}
+            }});
+            if (shouldScroll) {{
+                setTimeout(scrollToBottom, 50);
+                setTimeout(scrollToBottom, 200);
+            }}
+        }});
 
-        const chatContainer = document.getElementById('chat-container');
-        if (chatContainer) {
-            observer.observe(chatContainer, { childList: true, subtree: true });
-        }
+        // Observe entire body for Streamlit updates
+        observer.observe(document.body, {{
+            childList: true,
+            subtree: true,
+            attributes: false
+        }});
+
+        // Periodic check for 5 seconds after load
+        let checkCount = 0;
+        const periodicScroll = setInterval(function() {{
+            scrollToBottom();
+            checkCount++;
+            if (checkCount > 10) {{ // 10 checks = 5 seconds
+                clearInterval(periodicScroll);
+            }}
+        }}, 500);
         </script>
         """, unsafe_allow_html=True)
 
@@ -1011,8 +1052,8 @@ def main():
                 mainContent.style.setProperty('padding-left', '20px', 'important');
             }
 
-            toggleBtn.innerHTML = '☰';
-            toggleBtn.className = 'sidebar-toggle show';
+            toggleBtn.innerHTML = '▶️';
+            toggleBtn.className = 'sidebar-toggle sidebar-hidden';
             toggleBtn.title = '📂 Show Sidebar';
 
             window.SIDEBAR_STATE.hidden = true;
@@ -1034,10 +1075,10 @@ def main():
                 mainContent.style.removeProperty('padding-left');
             }
 
-            // Hide the toggle button when sidebar is visible
+            // Keep toggle button visible, just change style
             toggleBtn.className = 'sidebar-toggle';
-            toggleBtn.innerHTML = '☰';
-            toggleBtn.title = '📂 Show Sidebar';
+            toggleBtn.innerHTML = '◀️';
+            toggleBtn.title = '📂 Hide Sidebar';
 
             window.SIDEBAR_STATE.hidden = false;
             console.log('✅ Sidebar SHOWN successfully');
@@ -1051,13 +1092,16 @@ def main():
 
         const toggleBtn = document.getElementById('sidebar-toggle');
         if (toggleBtn && !window.SIDEBAR_STATE.initialized) {
-            // Initially hide the toggle button (sidebar is visible by default)
+            // Initialize toggle button (always visible, sidebar shown by default)
             toggleBtn.className = 'sidebar-toggle';
-            toggleBtn.innerHTML = '☰';
-            toggleBtn.title = '📂 Show Sidebar';
+            toggleBtn.innerHTML = '◀️';
+            toggleBtn.title = '📂 Hide Sidebar';
+            toggleBtn.style.display = 'block';
+            toggleBtn.style.visibility = 'visible';
+            toggleBtn.style.opacity = '1';
             window.SIDEBAR_STATE.hidden = false;
             window.SIDEBAR_STATE.initialized = true;
-            console.log('✅ Sidebar toggle INITIALIZED');
+            console.log('✅ Sidebar toggle INITIALIZED - Always visible');
             return true;
         }
         return false;
