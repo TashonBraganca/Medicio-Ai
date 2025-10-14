@@ -14,8 +14,11 @@ numpy>=1.24.0
 PyPDF2>=3.0.0
 pytesseract>=0.3.10
 
-# Data Processing  
+# Data Processing
 pandas>=2.0.0
+
+# System Monitoring (for CPU detection and max performance)
+psutil>=5.9.0
 
 # Note: External dependencies (install separately):
 # - Ollama: https://ollama.com/download

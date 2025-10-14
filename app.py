@@ -26,19 +26,16 @@ except ImportError as e:
     SERVICES_AVAILABLE = False
     st.error(f"Services not available: {e}")
 
-# Initialize persistent Ollama manager (only once)
+# Initialize persistent Ollama manager SILENTLY (only once) - NO SPLASH SCREEN
 if 'ollama_manager' not in st.session_state:
     from services.ollama_manager import ollama_manager
     st.session_state.ollama_manager = ollama_manager
 
-    # Start persistent server if not running
+    # Start persistent server SILENTLY in background - NO MESSAGES
     if not ollama_manager.startup_complete:
-        with st.spinner("Starting AI server... (one-time setup)"):
-            success, message = ollama_manager.start_persistent_server()
-            if success:
-                st.success("🚀 AI server ready for fast responses!")
-            else:
-                st.error(f"Failed to start AI server: {message}")
+        # Start silently without any UI messages
+        success, message = ollama_manager.start_persistent_server()
+        # Store status but don't display anything - direct to main page
 
 # Initialize services
 if SERVICES_AVAILABLE:
@@ -262,12 +259,21 @@ def load_css():
     """Load nuclear-level CSS for medical interface."""
     st.markdown("""
     <style>
-    /* Hide Streamlit defaults */
+    /* Hide Streamlit defaults - BUT KEEP HEADER FOR SIDEBAR CONTROLS */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
-    header {visibility: hidden;}
     .stDeployButton {display: none;}
     .stToolbar {display: none;}
+
+    /* Keep header visible for sidebar collapse/resize - just hide the unwanted parts */
+    header[data-testid="stHeader"] {
+        background: transparent !important;
+    }
+
+    /* Hide header hamburger menu but keep sidebar controls */
+    header [data-testid="stHeader"] > div:first-child {
+        display: none;
+    }
 
     /* NUCLEAR BACKGROUND SOLUTION - FORCE GRADIENT ON HTML/BODY FIRST */
     html {
@@ -559,55 +565,7 @@ def load_css():
         color: #fecaca !important;
     }
 
-    /* PROPERLY POSITIONED SIDEBAR TOGGLE BUTTON - ALWAYS VISIBLE */
-    .sidebar-toggle {
-        position: fixed !important;
-        top: 15px !important;
-        left: 15px !important;
-        z-index: 99999 !important;
-        background: rgba(30, 41, 59, 0.95) !important;
-        color: white !important;
-        border: 2px solid #3b82f6 !important;
-        border-radius: 8px !important;
-        padding: 8px 12px !important;
-        cursor: pointer !important;
-        font-size: 18px !important;
-        font-weight: bold !important;
-        transition: all 0.3s ease !important;
-        box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4) !important;
-        min-width: 44px !important;
-        min-height: 40px !important;
-        display: block !important;
-        visibility: visible !important;
-        opacity: 1 !important;
-    }
-
-    /* Enhanced visibility when sidebar is hidden */
-    .sidebar-toggle.sidebar-hidden {
-        background: rgba(59, 130, 246, 0.95) !important;
-        border-color: #60a5fa !important;
-        box-shadow: 0 6px 16px rgba(59, 130, 246, 0.6) !important;
-    }
-
-    .sidebar-toggle:hover {
-        background: #2563eb !important;
-        transform: scale(1.1) !important;
-        box-shadow: 0 6px 16px rgba(0,0,0,0.4) !important;
-    }
-
-    .sidebar-toggle:active {
-        transform: scale(0.95) !important;
-    }
-
-    /* Ensure sidebar can be hidden/shown properly */
-    [data-testid="stSidebar"] {
-        transition: all 0.3s ease !important;
-        z-index: 1000;
-    }
-
-    [data-testid="stAppViewContainer"] {
-        transition: margin-left 0.3s ease !important;
-    }
+    /* Streamlit's built-in sidebar collapse works perfectly - no custom toggle needed */
 
     /* PROPER ALERT STYLING WITH CONTRAST */
     .stAlert {
@@ -754,83 +712,7 @@ def render_chat_page():
 
     st.markdown('</div>', unsafe_allow_html=True)
 
-    # Enhanced Auto-scroll JavaScript - Works with Streamlit rerun
-    if st.session_state.chat_history:
-        # Get last message indicator for scroll targeting
-        last_msg_id = len(st.session_state.chat_history) - 1
-        st.markdown(f"""
-        <div id="scroll-anchor-{last_msg_id}" style="height: 1px;"></div>
-        <script>
-        // Ultra-aggressive scroll to bottom - works after Streamlit rerun
-        function scrollToBottom() {{
-            // Method 1: Scroll chat container
-            const chatContainer = document.getElementById('chat-container');
-            if (chatContainer) {{
-                chatContainer.scrollTop = chatContainer.scrollHeight;
-                chatContainer.scrollTo({{
-                    top: chatContainer.scrollHeight,
-                    behavior: 'smooth'
-                }});
-            }}
-
-            // Method 2: Scroll to anchor element
-            const scrollAnchor = document.getElementById('scroll-anchor-{last_msg_id}');
-            if (scrollAnchor) {{
-                scrollAnchor.scrollIntoView({{ behavior: 'smooth', block: 'end' }});
-            }}
-
-            // Method 3: Scroll window to bottom
-            window.scrollTo({{
-                top: document.documentElement.scrollHeight,
-                behavior: 'smooth'
-            }});
-        }}
-
-        // Immediate execution
-        scrollToBottom();
-
-        // Multiple timed executions to catch Streamlit rerun
-        setTimeout(scrollToBottom, 100);
-        setTimeout(scrollToBottom, 300);
-        setTimeout(scrollToBottom, 500);
-        setTimeout(scrollToBottom, 1000);
-
-        // Event-based execution
-        window.addEventListener('load', scrollToBottom);
-        document.addEventListener('DOMContentLoaded', scrollToBottom);
-
-        // Observe for DOM changes and scroll
-        const observer = new MutationObserver(function(mutations) {{
-            let shouldScroll = false;
-            mutations.forEach(function(mutation) {{
-                if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {{
-                    shouldScroll = true;
-                }}
-            }});
-            if (shouldScroll) {{
-                setTimeout(scrollToBottom, 50);
-                setTimeout(scrollToBottom, 200);
-            }}
-        }});
-
-        // Observe entire body for Streamlit updates
-        observer.observe(document.body, {{
-            childList: true,
-            subtree: true,
-            attributes: false
-        }});
-
-        // Periodic check for 5 seconds after load
-        let checkCount = 0;
-        const periodicScroll = setInterval(function() {{
-            scrollToBottom();
-            checkCount++;
-            if (checkCount > 10) {{ // 10 checks = 5 seconds
-                clearInterval(periodicScroll);
-            }}
-        }}, 500);
-        </script>
-        """, unsafe_allow_html=True)
+    # NO AUTO-SCROLL JAVASCRIPT - Streamlit handles this natively
 
     # Chat input
     if prompt := st.chat_input("Ask me anything medical..."):
@@ -963,203 +845,7 @@ def main():
     load_css()
     render_medical_background()
 
-    # NUCLEAR SIDEBAR TOGGLE - ULTIMATE SOLUTION
-    st.markdown("""
-    <div id="sidebar-toggle-container">
-        <button class="sidebar-toggle" onclick="nuclearSidebarToggle()" id="sidebar-toggle">
-            ☰
-        </button>
-    </div>
-
-    <script>
-    // ULTRA-PERSISTENT GLOBAL STATE
-    window.SIDEBAR_STATE = {
-        hidden: false,
-        initialized: false,
-        attempts: 0
-    };
-
-    function nuclearSidebarToggle() {
-        console.log('🚀 NUCLEAR TOGGLE ACTIVATED - State:', window.SIDEBAR_STATE);
-
-        // EXHAUSTIVE ELEMENT SEARCH
-        const sidebarSelectors = [
-            '[data-testid="stSidebar"]',
-            '.css-1d391kg',
-            'section[data-testid="stSidebar"]',
-            '.stSidebar',
-            '.sidebar',
-            'div[data-testid="stSidebar"]',
-            'aside[data-testid="stSidebar"]'
-        ];
-
-        const mainContentSelectors = [
-            '[data-testid="stAppViewContainer"]',
-            '.main',
-            '[data-testid="stMain"]',
-            '.stAppViewContainer',
-            '.main-content',
-            '.app-view-container'
-        ];
-
-        let sidebar = null;
-        let mainContent = null;
-
-        // Try every possible selector
-        for (const selector of sidebarSelectors) {
-            sidebar = document.querySelector(selector);
-            if (sidebar) break;
-        }
-
-        for (const selector of mainContentSelectors) {
-            mainContent = document.querySelector(selector);
-            if (mainContent) break;
-        }
-
-        const toggleBtn = document.getElementById('sidebar-toggle');
-
-        console.log('🔍 Elements located:', {
-            sidebar: sidebar ? 'FOUND' : 'NOT FOUND',
-            mainContent: mainContent ? 'FOUND' : 'NOT FOUND',
-            toggleBtn: toggleBtn ? 'FOUND' : 'NOT FOUND'
-        });
-
-        if (!sidebar) {
-            console.error('💥 CRITICAL: No sidebar element found with any selector!');
-            alert('❌ Sidebar not found! Page may not be fully loaded.');
-            return;
-        }
-
-        if (!toggleBtn) {
-            console.error('💥 CRITICAL: Toggle button not found!');
-            return;
-        }
-
-        // EXECUTE TOGGLE
-        if (!window.SIDEBAR_STATE.hidden) {
-            // === HIDE SIDEBAR ===
-            sidebar.style.setProperty('display', 'none', 'important');
-            sidebar.style.setProperty('visibility', 'hidden', 'important');
-            sidebar.style.setProperty('width', '0px', 'important');
-            sidebar.style.setProperty('min-width', '0px', 'important');
-            sidebar.style.setProperty('max-width', '0px', 'important');
-            sidebar.style.setProperty('opacity', '0', 'important');
-            sidebar.style.setProperty('transform', 'translateX(-100%)', 'important');
-            sidebar.style.setProperty('pointer-events', 'none', 'important');
-
-            if (mainContent) {
-                mainContent.style.setProperty('margin-left', '0px', 'important');
-                mainContent.style.setProperty('padding-left', '20px', 'important');
-            }
-
-            toggleBtn.innerHTML = '▶️';
-            toggleBtn.className = 'sidebar-toggle sidebar-hidden';
-            toggleBtn.title = '📂 Show Sidebar';
-
-            window.SIDEBAR_STATE.hidden = true;
-            console.log('✅ Sidebar HIDDEN successfully');
-
-        } else {
-            // === SHOW SIDEBAR ===
-            sidebar.style.removeProperty('display');
-            sidebar.style.removeProperty('visibility');
-            sidebar.style.removeProperty('width');
-            sidebar.style.removeProperty('min-width');
-            sidebar.style.removeProperty('max-width');
-            sidebar.style.removeProperty('opacity');
-            sidebar.style.removeProperty('transform');
-            sidebar.style.removeProperty('pointer-events');
-
-            if (mainContent) {
-                mainContent.style.removeProperty('margin-left');
-                mainContent.style.removeProperty('padding-left');
-            }
-
-            // Keep toggle button visible, just change style
-            toggleBtn.className = 'sidebar-toggle';
-            toggleBtn.innerHTML = '◀️';
-            toggleBtn.title = '📂 Hide Sidebar';
-
-            window.SIDEBAR_STATE.hidden = false;
-            console.log('✅ Sidebar SHOWN successfully');
-        }
-    }
-
-    // PROPER INITIALIZATION
-    function nuclearInitialization() {
-        window.SIDEBAR_STATE.attempts++;
-        console.log(`🔄 Sidebar init attempt #${window.SIDEBAR_STATE.attempts}`);
-
-        const toggleBtn = document.getElementById('sidebar-toggle');
-        if (toggleBtn && !window.SIDEBAR_STATE.initialized) {
-            // Initialize toggle button (always visible, sidebar shown by default)
-            toggleBtn.className = 'sidebar-toggle';
-            toggleBtn.innerHTML = '◀️';
-            toggleBtn.title = '📂 Hide Sidebar';
-            toggleBtn.style.display = 'block';
-            toggleBtn.style.visibility = 'visible';
-            toggleBtn.style.opacity = '1';
-            window.SIDEBAR_STATE.hidden = false;
-            window.SIDEBAR_STATE.initialized = true;
-            console.log('✅ Sidebar toggle INITIALIZED - Always visible');
-            return true;
-        }
-        return false;
-    }
-
-    // IMMEDIATE EXECUTION
-    nuclearInitialization();
-
-    // DOM READY HANDLERS
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', function() {
-            setTimeout(nuclearInitialization, 50);
-            setTimeout(nuclearInitialization, 200);
-            setTimeout(nuclearInitialization, 500);
-            setTimeout(nuclearInitialization, 1000);
-        });
-    } else {
-        setTimeout(nuclearInitialization, 50);
-        setTimeout(nuclearInitialization, 200);
-    }
-
-    // WINDOW LOAD HANDLERS
-    window.addEventListener('load', function() {
-        setTimeout(nuclearInitialization, 50);
-        setTimeout(nuclearInitialization, 300);
-        setTimeout(nuclearInitialization, 800);
-    });
-
-    // PERSISTENT MONITORING - Check every 500ms for 10 seconds
-    let monitorAttempts = 0;
-    const MONITOR_INTERVAL = setInterval(function() {
-        if (window.SIDEBAR_STATE.initialized || monitorAttempts > 20) {
-            clearInterval(MONITOR_INTERVAL);
-            console.log('🏁 Nuclear monitoring completed');
-        } else {
-            nuclearInitialization();
-        }
-        monitorAttempts++;
-    }, 500);
-
-    // MUTATION OBSERVER FOR DYNAMIC CONTENT
-    const observer = new MutationObserver(function(mutations) {
-        if (!window.SIDEBAR_STATE.initialized) {
-            setTimeout(nuclearInitialization, 100);
-        }
-    });
-
-    observer.observe(document.body, {
-        childList: true,
-        subtree: true,
-        attributes: true
-    });
-
-    console.log('🚀 Nuclear sidebar toggle system LOADED');
-    </script>
-    """, unsafe_allow_html=True)
-
-    # Render sidebar
+    # Render sidebar (using Streamlit's built-in collapse - it works perfectly!)
     render_sidebar()
 
     # Page routing

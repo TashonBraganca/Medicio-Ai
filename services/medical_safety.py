@@ -265,14 +265,8 @@ This AI detected potentially dangerous medical advice in the response.
             """
 
         else:
-            # Safe response - add disclaimer
-            return f"""
-{original_response}
-
----
-
-{self.general_disclaimer}
-            """
+            # Safe response - NO DISCLAIMER (removed per user request)
+            return original_response
 
     def validate_medical_response(self, user_input: str, ai_response: str) -> Tuple[bool, str]:
         """

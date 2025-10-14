@@ -51,9 +51,17 @@ class PersistentOllamaManager:
         # Check if already running
         if self.is_server_running():
             logger.info("Ollama already running - using existing instance")
+            # Still pre-load model for instant responses
+            logger.info("Pre-loading model for zero-delay responses...")
+            model_preload_success = self._preload_model(config.DEFAULT_LLM_MODEL)
+
             self.is_running = True
             self.startup_complete = True
-            return True, "Ollama already running"
+
+            if model_preload_success:
+                return True, "Ollama already running with pre-loaded model"
+            else:
+                return True, "Ollama already running (model pre-load failed)"
 
         # Check if we already started it
         if self.is_running and self.process and self.process.poll() is None:
@@ -96,11 +104,20 @@ class PersistentOllamaManager:
             startup_success = self._wait_for_startup()
 
             if startup_success:
+                # Pre-load model into memory for instant responses
+                logger.info("Pre-loading model for zero-delay responses...")
+                model_preload_success = self._preload_model(config.DEFAULT_LLM_MODEL)
+
                 self.is_running = True
                 self.startup_complete = True
                 self._start_health_monitoring()
-                logger.info("✅ Persistent Ollama server ready for fast responses!")
-                return True, f"Ollama server started successfully (PID: {self.process.pid})"
+
+                if model_preload_success:
+                    logger.info("✅ Persistent Ollama server ready with pre-loaded model - INSTANT RESPONSES!")
+                    return True, f"Ollama server started with pre-loaded model (PID: {self.process.pid})"
+                else:
+                    logger.warning("⚠️ Server ready but model pre-load failed - first request may be slower")
+                    return True, f"Ollama server started (PID: {self.process.pid}) - model pre-load failed"
             else:
                 logger.error("Ollama server failed to start properly")
                 return False, "Failed to start Ollama server"
@@ -139,6 +156,57 @@ class PersistentOllamaManager:
 
         logger.error(f"Ollama server not ready after {max_wait} seconds")
         return False
+
+    def _preload_model(self, model_name: str) -> bool:
+        """Pre-load model into memory to eliminate first-request delay with MAXIMUM CPU USAGE"""
+        try:
+            import os
+            import psutil
+
+            # Detect maximum CPU threads available
+            cpu_count = psutil.cpu_count(logical=True) if hasattr(psutil, 'cpu_count') else os.cpu_count()
+            max_threads = cpu_count if cpu_count else 8
+
+            logger.info(f"🔥 Pre-loading model '{model_name}' with MAX CPU ({max_threads} threads)...")
+
+            # Make a dummy request to warm up the model with MAXIMUM PERFORMANCE
+            response = requests.post(
+                f"{config.OLLAMA_BASE_URL}/api/generate",
+                json={
+                    "model": model_name,
+                    "prompt": "Hello",
+                    "stream": False,
+                    "options": {
+                        "num_predict": 5,  # Minimal tokens for fast warmup
+                        "num_thread": max_threads,  # USE ALL CPU THREADS
+                        "num_gpu": 99,  # Use all available GPU layers if GPU present
+                        "num_ctx": 2048,  # Context size
+                        "use_mmap": True,  # Memory-mapped files for faster loading
+                        "use_mlock": True  # Lock model in memory
+                    }
+                },
+                timeout=120  # Give model time to load with full resources
+            )
+
+            if response.status_code == 200:
+                logger.info(f"✅ Model '{model_name}' pre-loaded and ready for instant responses!")
+                return True
+            elif response.status_code == 404:
+                logger.warning(f"⚠️ Model '{model_name}' not found - attempting fallback model")
+                # Try fallback model
+                if hasattr(config, 'FALLBACK_LLM_MODEL') and config.FALLBACK_LLM_MODEL != model_name:
+                    return self._preload_model(config.FALLBACK_LLM_MODEL)
+                return False
+            else:
+                logger.error(f"❌ Failed to pre-load model: HTTP {response.status_code}")
+                return False
+
+        except requests.exceptions.Timeout:
+            logger.error(f"⏱️ Model pre-load timed out (model may be too large or system slow)")
+            return False
+        except Exception as e:
+            logger.error(f"❌ Error pre-loading model: {str(e)}")
+            return False
 
     def _start_health_monitoring(self):
         """Start background health monitoring"""

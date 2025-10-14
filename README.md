@@ -17,10 +17,11 @@
 ## ✨ Features
 
 ### 💬 **Medical Chat Assistant**
-- **Structured medical guidance** with 7 standardized sections
-- **Emergency detection** for urgent symptoms
-- **Evidence-based responses** optimized for medical accuracy
-- **Ultra-fast responses** using Gemma2:2b model
+- **Medical Expert Model** - Uses Meditron:7b trained on medical literature
+- **Structured medical guidance** with organized sections and **bold formatting**
+- **Indian medication recommendations** with detailed dosage tables
+- **Context-aware emergency detection** for urgent symptoms
+- **Instant responses** with pre-loaded models and maximum CPU optimization
 
 ### 📄 **Medical Document Analysis**
 - Upload **lab reports, prescriptions, medical documents**
@@ -92,17 +93,18 @@ curl -fsSL https://ollama.com/install.sh | sh
 After installing Ollama, open a new terminal and run:
 
 ```bash
-# Install primary model (1.6 GB)
-ollama pull gemma2:2b
+# Install MEDICAL EXPERT model - trained on medical literature (4.1 GB) - RECOMMENDED
+ollama pull meditron:7b
 
-# Install fallback model (934 MB)
-ollama pull qwen2:1.5b
+# Install fast fallback models
+ollama pull gemma2:2b      # Fast model (1.6 GB)
+ollama pull qwen2:1.5b     # Ultra-fast fallback (934 MB)
 
 # Install vision model for image analysis (4.7 GB)
 ollama pull llava:7b
 ```
 
-**Note**: Models will download in the background. This may take 5-15 minutes depending on your internet speed.
+**Note**: Models will download in the background. The app uses **Meditron:7b by default** for superior medical accuracy. Download time: 10-20 minutes depending on internet speed.
 
 #### 3️⃣ Clone & Setup Application
 
@@ -178,18 +180,22 @@ ollama list
 
 ## 🧠 AI Models & Performance
 
-### **Ultra-Fast Model Strategy**
-| Model | Purpose | Size | Speed | Quality |
-|-------|---------|------|-------|---------|
-| **Gemma2:2b** | Medical Chat & Documents | 2B params | ⚡⚡⚡⚡⚡ | ⭐⭐⭐⭐ |
-| **Qwen2:1.5b** | Fallback Model | 1.5B params | ⚡⚡⚡⚡⚡ | ⭐⭐⭐⭐ |
-| **LLaVA:7b** | Image Analysis | 7B params | ⚡⚡⚡ | ⭐⭐⭐⭐⭐ |
+### **Medical-Optimized Model Strategy**
+| Model | Purpose | Size | Medical Accuracy | Speed |
+|-------|---------|------|------------------|-------|
+| **Meditron:7b** 👑 | Primary Medical Chat | 7B params | ⭐⭐⭐⭐⭐ (Trained on medical literature) | ⚡⚡⚡⚡ |
+| **LLama3.1:8b** | High-Quality Fallback | 8B params | ⭐⭐⭐⭐ | ⚡⚡⚡⭐ |
+| **Gemma2:2b** | Fast Fallback | 2B params | ⭐⭐⭐⭐ | ⚡⚡⚡⚡⚡ |
+| **Qwen2:1.5b** | Ultra-Fast Fallback | 1.5B params | ⭐⭐⭐ | ⚡⚡⚡⚡⚡ |
+| **LLaVA:7b** | Image Analysis | 7B params | ⭐⭐⭐⭐⭐ | ⚡⚡⚡ |
 
 ### **Performance Optimizations**
-- 🚀 **25-35 second average** response time with ultra-fast models
-- ⚡ **Auto-model switching** between Gemma2:2b and Qwen2:1.5b
-- 🎯 **Optimized prompts** for medical accuracy
-- 📊 **Structured responses** with 7 standardized sections
+- 🏥 **Medical Expert Model** - Meditron:7b outperforms GPT-3.5 on medical tasks
+- 🚀 **Instant startup** - Models pre-loaded on app launch with zero delay
+- ⚡ **Maximum CPU usage** - Automatically detects and uses all available CPU threads
+- 🎯 **Optimized prompts** for Indian medications and detailed guidance
+- 📊 **Structured responses** with bold formatting for easy reading
+- 🔄 **Progressive fallback** - Automatic model switching if primary unavailable
 
 ---
 
@@ -204,10 +210,12 @@ ollama list
 ### **Key UI Features**
 - **Searchable model selection** - Find and switch between AI models instantly
 - **Active model indicator** - Real-time display of current model in use
-- **Sidebar toggle** for space optimization
-- **Auto-scroll chat** for seamless conversation
+- **Streamlit native sidebar** - Smooth collapse/expand functionality
+- **Bold formatting** - Key topics and medications highlighted for easy scanning
+- **Indian medication tables** - Detailed dosage, timing, and purpose
 - **File upload** with drag-and-drop support
 - **Color-coded alerts** for emergency indicators
+- **No disclaimers** - Clean, focused medical responses
 
 ---
 

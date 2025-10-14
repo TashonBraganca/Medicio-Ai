@@ -284,10 +284,8 @@ class MedicalChatService:
                         except json.JSONDecodeError:
                             continue
 
-                # CRITICAL: Add medical disclaimer at end of streaming response
-                if response_text.strip():
-                    disclaimer = "\n\n---\n\n" + medical_safety.general_disclaimer
-                    yield disclaimer
+                # NO DISCLAIMER - Keep response clean and concise
+                pass
             else:
                 yield f"Error: Ollama service returned status code {response.status_code}"
                 
