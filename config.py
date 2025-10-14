@@ -55,10 +55,9 @@ class MediLensConfig:
         "qwen2:1.5b",     # Ultra-fast fallback (~20-30s)
     ]
 
-    DEFAULT_LLM_MODEL = "gemma2:2b"  # Fast, efficient model - INSTALLED
-    FALLBACK_LLM_MODEL = "qwen2:1.5b"  # Ultra-fast fallback if gemma2 not available
-    # Optional medical expert model (download with: ollama pull meditron:7b)
-    MEDICAL_EXPERT_MODEL = "meditron:7b"  # Medical-specific model (4.1 GB) - Not installed
+    DEFAULT_LLM_MODEL = "meditron:7b"  # 🏆 MEDICAL EXPERT - Best medical accuracy, trained on medical literature
+    FALLBACK_LLM_MODEL = "gemma2:2b"  # Fast general model if meditron unavailable
+    FALLBACK_FAST_MODEL = "qwen2:1.5b"  # Ultra-fast final fallback
     DEFAULT_VISION_MODEL = "llava:7b"
 
     # Auto-download models if missing (DISABLED - models persist in Ollama storage)
