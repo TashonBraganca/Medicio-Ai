@@ -64,12 +64,18 @@ class MediLensConfig:
     AUTO_DOWNLOAD_MODELS = False  # Models already downloaded persist permanently in Ollama
     ESSENTIAL_MODELS = ["meditron:7b", "gemma2:2b", "qwen2:1.5b", "llava:7b"]  # meditron:7b added for medical accuracy
 
-    # Medical Response Parameters - Optimized for CONCISE yet DETAILED responses with medication tables
-    DEFAULT_TEMPERATURE = 0.3   # Balanced for natural, personalized responses
-    DEFAULT_MAX_TOKENS = 550     # REDUCED by 8% (from 600) - concise but complete medicine table and key instructions
-    CHAT_TEMPERATURE = 0.3       # Natural medical responses with personality
+    # Medical Response Parameters - ACCURACY OPTIMIZED for meditron:7b
+    DEFAULT_TEMPERATURE = 0.3   # Balanced for nuanced medical responses
+    DEFAULT_MAX_TOKENS = 600     # SUFFICIENT for detailed medical guidance
+    CHAT_TEMPERATURE = 0.3       # Natural, accurate medical responses
     OCR_TEMPERATURE = 0.2        # Balanced document analysis
     VISION_TEMPERATURE = 0.2     # Balanced vision analysis
+
+    # Accuracy optimization for meditron:7b (medical expert model)
+    NUM_CTX = 2048               # Larger context for better medical reasoning
+    REPEAT_PENALTY = 1.1         # Gentle prevention of repetition
+    TOP_K = 40                   # Wider selection for more natural language
+    TOP_P = 0.9                  # High diversity for comprehensive answers
     
     # UI Configuration
     PAGE_TITLE = f"{APP_NAME} - Medical AI Assistant"
@@ -179,47 +185,33 @@ class MediLensConfig:
     def get_medical_prompts(cls) -> Dict[str, str]:
         """Get standardized medical prompts."""
         return {
-            "chat_system": """You are an expert medical advisor. Provide CONCISE, USEFUL responses with specific actionable advice. CRITICAL REQUIREMENT: You MUST include a complete medication table.
+            "chat_system": """You are a medical expert. Provide accurate, detailed medical guidance following this structure:
 
-**🩺 CONDITION & RISK**
-• **[Specific Condition/Disease Name]** | Risk: [🟢 LOW / 🟡 MODERATE / 🔴 HIGH - URGENT]
-• **Brief explanation:** [1-2 sentences about what this is and why it happens]
+**CONDITION & RISK:**
+Identify the likely condition and assess risk level (LOW/MODERATE/HIGH)
 
-**💊 IMMEDIATE ACTIONS** (**step-by-step**):
-1. **[Action #1]:** [Specific instructions - be concise but clear]
-2. **[Action #2]:** [Specific instructions with key details]
-3. **[Action #3]:** [Detailed guidance with specifics]
+**IMMEDIATE ACTIONS:**
+1. Specific first action with clear instructions
+2. Second action with details
+3. Third action with timing
 
-**💊 RECOMMENDED INDIAN MEDICINES**
-
-MANDATORY: Include complete medication table in EXACT markdown format:
+**RECOMMENDED INDIAN MEDICINES:**
 
 | **Medicine Name** | **Dosage** | **How Many Times/Day** | **For How Many Days** | **Purpose** |
-|---------------|--------|-------------------|-------------------|---------|
-| [Indian Brand] | [Exact amount] | [Specific times] | [Exact days] | [What it treats] |
-| [Indian Brand] | [Exact amount] | [Specific times] | [Exact days] | [What it treats] |
-| [Indian Brand] | [Exact amount] | [Specific times] | [Exact days] | [What it treats] |
+|------------------|-----------|------------------------|----------------------|-------------|
+| Dolo 650 | 650mg tablet | 3 times (morning, afternoon, evening) | 3-5 days | Reduces fever and body pain |
+| Sinarest | 1 tablet | 2 times (morning, evening) | 3 days | Relieves cold, congestion, runny nose |
 
-**EXAMPLE (Always format like this):**
-| **Medicine Name** | **Dosage** | **How Many Times/Day** | **For How Many Days** | **Purpose** |
-|---------------|--------|-------------------|-------------------|---------|
-| **Dolo 650** | 650mg tablet | 3 times (morning, afternoon, night) | 5 days | Reduces fever and body pain |
-| **Sinarest** | 1 tablet | 2 times (morning, evening) | 3 days | Relieves cold, congestion, runny nose |
-| **ORS Solution** | 1 sachet in 1L water | 3-4 times | Until symptoms improve | Prevents dehydration, replaces electrolytes |
+Use these Indian medicine brands: Dolo 650, Crocin 500, Paracetamol, Combiflam, Sinarest, Vicks Action 500, Cetrizine, ORS powder, Zincovit tablets.
+Include 2-4 medicines with exact dosages, timing, and duration.
 
-Use specific Indian brands: Dolo 650, Crocin 500, Combiflam, Sinarest, Zincovit, ORS, Cetrizine, Paracetamol, etc.
+**WHEN TO SEE DOCTOR:**
+List specific warning signs and timeline (e.g., "if no improvement in 48 hours")
 
-**🏥 WHEN TO SEE DOCTOR:**
-• **[Specific symptom]** that requires doctor visit
-• **[Another warning sign]** to watch for
-• **Timeline:** [When exactly to visit - e.g., "If no improvement in 48 hours"]
+**ADDITIONAL TIPS:**
+Diet recommendations, lifestyle changes, what to monitor
 
-**📋 ADDITIONAL TIPS:**
-• **Diet:** [Helpful diet tip]
-• **Lifestyle:** [Key lifestyle advice]
-• **Monitor:** [What to watch]
-
-Keep response FOCUSED and CONCISE. Be specific with doses, times, and instructions. Make all key points and topics BOLD for easy reading.""",
+Make all headings and key medical terms BOLD. Be specific and medically accurate.""",
 
             "ocr_system": """You are a specialized medical document analyst. Analyze the extracted text and provide comprehensive medical interpretation.
 

@@ -249,18 +249,18 @@ class MedicalChatService:
             # Prepare messages for Ollama
             messages = self._prepare_messages(user_message, chat_history)
             
-            # Universal streaming with current best model
+            # ACCURACY-OPTIMIZED for meditron:7b (medical expert model)
             payload = {
                 "model": self.model,
                 "messages": messages,
                 "stream": True,
                 "options": {
-                    "temperature": config.CHAT_TEMPERATURE,
-                    "num_predict": config.DEFAULT_MAX_TOKENS,
-                    "top_k": 20,
-                    "top_p": 0.7,
-                    "repeat_penalty": 1.0,
-                    "num_ctx": 1024
+                    "temperature": config.CHAT_TEMPERATURE,  # 0.3 for balanced accuracy
+                    "num_predict": config.DEFAULT_MAX_TOKENS,  # 600 for complete responses
+                    "top_k": config.TOP_K,  # 40 for natural language
+                    "top_p": config.TOP_P,  # 0.9 for comprehensive answers
+                    "repeat_penalty": config.REPEAT_PENALTY,  # 1.1 gentle
+                    "num_ctx": config.NUM_CTX  # 2048 for better reasoning
                 }
             }
             
@@ -341,18 +341,18 @@ class MedicalChatService:
     def _call_ollama(self, messages: List[Dict]) -> Dict[str, Any]:
         """Universal cross-platform Ollama API call with robust error handling."""
 
-        # Use current best model with OS-optimized settings
+        # ACCURACY-OPTIMIZED for meditron:7b - HIGH-QUALITY medical responses
         payload = {
             "model": self.model,
             "messages": messages,
             "stream": False,
             "options": {
-                "temperature": config.CHAT_TEMPERATURE,
-                "num_predict": config.DEFAULT_MAX_TOKENS,
-                "top_k": 20,
-                "top_p": 0.7,
-                "repeat_penalty": 1.0,
-                "num_ctx": 1024,
+                "temperature": config.CHAT_TEMPERATURE,  # 0.3 for balanced accuracy
+                "num_predict": config.DEFAULT_MAX_TOKENS,  # 600 for complete responses
+                "top_k": config.TOP_K,  # 40 for natural language
+                "top_p": config.TOP_P,  # 0.9 for comprehensive answers
+                "repeat_penalty": config.REPEAT_PENALTY,  # 1.1 gentle
+                "num_ctx": config.NUM_CTX,  # 2048 for better medical reasoning
                 "seed": 42
             }
         }
