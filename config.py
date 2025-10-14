@@ -55,9 +55,9 @@ class MediLensConfig:
         "qwen2:1.5b",     # Ultra-fast fallback (~20-30s)
     ]
 
-    DEFAULT_LLM_MODEL = "meditron:7b"  # 🏆 MEDICAL EXPERT - Best medical accuracy, trained on medical literature
-    FALLBACK_LLM_MODEL = "gemma2:2b"  # Fast general model if meditron unavailable
-    FALLBACK_FAST_MODEL = "qwen2:1.5b"  # Ultra-fast final fallback
+    DEFAULT_LLM_MODEL = "gemma2:9b"  # 🏆 BEST - 9B model for superior medical accuracy and comprehension
+    FALLBACK_LLM_MODEL = "gemma2:2b"  # Fast fallback
+    FALLBACK_FAST_MODEL = "qwen2:1.5b"  # Ultra-fast fallback
     DEFAULT_VISION_MODEL = "llava:7b"
 
     # Auto-download models if missing (DISABLED - models persist in Ollama storage)
@@ -185,57 +185,29 @@ class MediLensConfig:
     def get_medical_prompts(cls) -> Dict[str, str]:
         """Get standardized medical prompts."""
         return {
-            "chat_system": """You are a medical expert. Analyze symptoms and provide structured advice.
+            "chat_system": """You are a doctor in India. A patient describes symptoms. Give clear medical advice with Indian medicines.
 
-Example response format:
+Format your response like this:
 
----
+🩺 **WHAT YOU LIKELY HAVE:** Brief explanation of the medical condition and severity
 
-🩺 **CONDITION & RISK:** Viral Fever - 🟡 MODERATE risk
+💊 **WHAT TO DO RIGHT NOW:**
+1. First specific action
+2. Second specific action
+3. Third specific action
 
----
+💊 **MEDICINES TO TAKE:**
 
-💊 **IMMEDIATE ACTIONS:**
+| Medicine | How Much | How Often | How Long | What It Does |
+|---|---|---|---|---|
+| Dolo 650 | 1 tablet | 3 times daily | 5 days | Reduces fever |
+| ENO | 1 sachet | When needed | Until better | Reduces acidity |
 
-1. 😴 **Rest completely** - Get 8-10 hours sleep, avoid physical exertion
+🏥 **GO TO DOCTOR IF:** Warning signs to watch for
 
-2. 💧 **Stay hydrated** - Drink 3-4 liters water, ORS solution, coconut water
+📋 **OTHER ADVICE:** Food, rest, what to avoid
 
-3. 🌡️ **Monitor temperature** - Check every 4 hours, note if above 102°F
-
----
-
-💊 **RECOMMENDED INDIAN MEDICINES:**
-
-| **Medicine Name** | **Dosage** | **How Many Times/Day** | **For How Many Days** | **Purpose** |
-|------------------|-----------|------------------------|----------------------|-------------|
-| **Dolo 650** | 650mg tablet | 3 times (morning, afternoon, evening) | 3-5 days | Reduces fever and body pain |
-| **Sinarest** | 1 tablet | 2 times (morning, evening) | 3 days | Relieves cold, congestion, runny nose |
-| **ORS Powder** | 1 sachet in 1L water | 3-4 times throughout day | Until recovery | Prevents dehydration, replaces electrolytes |
-
----
-
-🏥 **WHEN TO SEE DOCTOR:**
-
-• ⚠️ Fever persists beyond **3 days** or rises above **103°F**
-
-• ⚠️ Severe headache, stiff neck, or **difficulty breathing**
-
-• ⚠️ **No improvement in 48 hours** despite medication
-
----
-
-📋 **ADDITIONAL TIPS:**
-
-• 🍲 **Diet:** Light meals - khichdi, soup, fruits (oranges, bananas)
-
-• ❌ **Avoid:** Oily, spicy food, caffeine, alcohol
-
-• 📊 **Monitor:** Body temperature, fluid intake, energy levels
-
----
-
-Now respond to the user's query in this EXACT format with emojis, spacing, and appropriate Indian medicines. Make key terms **BOLD**.""",
+Be specific. Give actual medical advice for THEIR symptoms.""",
 
             "ocr_system": """You are a specialized medical document analyst. Analyze the extracted text and provide comprehensive medical interpretation.
 
