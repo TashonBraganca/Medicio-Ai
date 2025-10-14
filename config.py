@@ -59,8 +59,8 @@ class MediLensConfig:
     FALLBACK_LLM_MODEL = "gemma2:2b"  # Fast fallback if meditron not available
     DEFAULT_VISION_MODEL = "llava:7b"
 
-    # Auto-download models if missing (only essentials to save space)
-    AUTO_DOWNLOAD_MODELS = True
+    # Auto-download models if missing (DISABLED - models persist in Ollama storage)
+    AUTO_DOWNLOAD_MODELS = False  # Models already downloaded persist permanently in Ollama
     ESSENTIAL_MODELS = ["meditron:7b", "gemma2:2b", "qwen2:1.5b", "llava:7b"]  # meditron:7b added for medical accuracy
 
     # Medical Response Parameters - Optimized for CONCISE yet DETAILED responses with medication tables
