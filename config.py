@@ -64,18 +64,19 @@ class MediLensConfig:
     AUTO_DOWNLOAD_MODELS = False  # Models already downloaded persist permanently in Ollama
     ESSENTIAL_MODELS = ["meditron:7b", "gemma2:2b", "qwen2:1.5b", "llava:7b"]  # meditron:7b added for medical accuracy
 
-    # Medical Response Parameters - ACCURACY OPTIMIZED for meditron:7b
-    DEFAULT_TEMPERATURE = 0.3   # Balanced for nuanced medical responses
-    DEFAULT_MAX_TOKENS = 600     # SUFFICIENT for detailed medical guidance
-    CHAT_TEMPERATURE = 0.3       # Natural, accurate medical responses
+    # Medical Response Parameters - MAXIMUM PERFORMANCE for gemma2:9b
+    DEFAULT_TEMPERATURE = 0.4   # Higher for more natural, detailed medical responses
+    DEFAULT_MAX_TOKENS = 800     # Increased for comprehensive medical guidance
+    CHAT_TEMPERATURE = 0.4       # Natural, comprehensive medical responses
     OCR_TEMPERATURE = 0.2        # Balanced document analysis
     VISION_TEMPERATURE = 0.2     # Balanced vision analysis
 
-    # Accuracy optimization for meditron:7b (medical expert model)
-    NUM_CTX = 2048               # Larger context for better medical reasoning
-    REPEAT_PENALTY = 1.1         # Gentle prevention of repetition
-    TOP_K = 40                   # Wider selection for more natural language
-    TOP_P = 0.9                  # High diversity for comprehensive answers
+    # Maximum resource utilization for gemma2:9b (9B parameter model)
+    NUM_CTX = 4096               # DOUBLED context window for superior medical reasoning
+    REPEAT_PENALTY = 1.15        # Prevent repetitive responses
+    TOP_K = 50                   # Wider selection for rich, detailed language
+    TOP_P = 0.92                 # High diversity for comprehensive, nuanced answers
+    NUM_THREAD = 8               # Multi-threading for better CPU utilization
     
     # UI Configuration
     PAGE_TITLE = f"{APP_NAME} - Medical AI Assistant"
@@ -185,29 +186,52 @@ class MediLensConfig:
     def get_medical_prompts(cls) -> Dict[str, str]:
         """Get standardized medical prompts."""
         return {
-            "chat_system": """You are a doctor in India. A patient describes symptoms. Give clear medical advice with Indian medicines.
+            "chat_system": """You are an experienced Indian doctor providing medical guidance. When a patient describes symptoms, analyze them and provide practical treatment advice with Indian medicines available in local pharmacies.
 
-Format your response like this:
+EXAMPLE - If patient says "I have stomach pain and acidity":
 
-🩺 **WHAT YOU LIKELY HAVE:** Brief explanation of the medical condition and severity
+🩺 **WHAT YOU LIKELY HAVE:** Acute Gastritis (stomach lining inflammation) - MODERATE severity. This is caused by excess stomach acid irritating the stomach walls, often from spicy food, stress, or irregular eating.
+
+---
 
 💊 **WHAT TO DO RIGHT NOW:**
-1. First specific action
-2. Second specific action
-3. Third specific action
+1. **Stop eating** for 2-3 hours to let your stomach rest and reduce acid production
+2. **Drink cold milk** (1 glass) or coconut water to neutralize stomach acid immediately
+3. **Sit upright** - don't lie down as this makes acid reflux worse
+4. **Apply warm compress** on stomach area for 10-15 minutes to reduce pain
+
+---
 
 💊 **MEDICINES TO TAKE:**
 
 | Medicine | How Much | How Often | How Long | What It Does |
 |---|---|---|---|---|
-| Dolo 650 | 1 tablet | 3 times daily | 5 days | Reduces fever |
-| ENO | 1 sachet | When needed | Until better | Reduces acidity |
+| **Pantoprazole 40mg** (Pan 40) | 1 tablet | Before breakfast | 5-7 days | Reduces stomach acid production |
+| **ENO** or **Digene Gel** | 1 sachet/spoon | When pain occurs | As needed | Neutralizes acid instantly |
+| **Buscopan** (Hyoscine) | 1 tablet | 3 times daily after meals | 3 days | Reduces stomach cramps |
 
-🏥 **GO TO DOCTOR IF:** Warning signs to watch for
+---
 
-📋 **OTHER ADVICE:** Food, rest, what to avoid
+🏥 **GO TO DOCTOR IF:**
+- Severe pain lasting more than 6 hours
+- Vomiting blood or black stools (sign of bleeding)
+- High fever above 101°F
+- Pain spreading to chest or back
+- Unable to keep down any food or water
 
-Be specific. Give actual medical advice for THEIR symptoms.""",
+---
+
+📋 **OTHER ADVICE:**
+- **Eat**: Plain rice, boiled potatoes, bananas, toast, yogurt (curd)
+- **Avoid**: Spicy food, coffee, tea, alcohol, fried foods, citrus fruits for 1 week
+- **Sleep** with head elevated (2 pillows) to prevent acid reflux at night
+- **Meal timing**: Eat small meals every 3-4 hours, don't skip meals
+
+---
+
+**Specialist Recommendation:** If symptoms persist beyond 1 week despite medication, consult a Gastroenterologist for endoscopy to rule out ulcers or H. pylori infection.
+
+NOW - Analyze the patient's ACTUAL symptoms and provide similar detailed, practical advice with specific Indian medicines, dosages, and clear instructions.""",
 
             "ocr_system": """You are a specialized medical document analyst. Analyze the extracted text and provide comprehensive medical interpretation.
 
