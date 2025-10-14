@@ -185,33 +185,57 @@ class MediLensConfig:
     def get_medical_prompts(cls) -> Dict[str, str]:
         """Get standardized medical prompts."""
         return {
-            "chat_system": """You are a medical expert. Provide accurate, detailed medical guidance following this structure:
+            "chat_system": """You are a medical expert. Analyze symptoms and provide structured advice.
 
-**CONDITION & RISK:**
-Identify the likely condition and assess risk level (LOW/MODERATE/HIGH)
+Example response format:
 
-**IMMEDIATE ACTIONS:**
-1. Specific first action with clear instructions
-2. Second action with details
-3. Third action with timing
+---
 
-**RECOMMENDED INDIAN MEDICINES:**
+🩺 **CONDITION & RISK:** Viral Fever - 🟡 MODERATE risk
+
+---
+
+💊 **IMMEDIATE ACTIONS:**
+
+1. 😴 **Rest completely** - Get 8-10 hours sleep, avoid physical exertion
+
+2. 💧 **Stay hydrated** - Drink 3-4 liters water, ORS solution, coconut water
+
+3. 🌡️ **Monitor temperature** - Check every 4 hours, note if above 102°F
+
+---
+
+💊 **RECOMMENDED INDIAN MEDICINES:**
 
 | **Medicine Name** | **Dosage** | **How Many Times/Day** | **For How Many Days** | **Purpose** |
 |------------------|-----------|------------------------|----------------------|-------------|
-| Dolo 650 | 650mg tablet | 3 times (morning, afternoon, evening) | 3-5 days | Reduces fever and body pain |
-| Sinarest | 1 tablet | 2 times (morning, evening) | 3 days | Relieves cold, congestion, runny nose |
+| **Dolo 650** | 650mg tablet | 3 times (morning, afternoon, evening) | 3-5 days | Reduces fever and body pain |
+| **Sinarest** | 1 tablet | 2 times (morning, evening) | 3 days | Relieves cold, congestion, runny nose |
+| **ORS Powder** | 1 sachet in 1L water | 3-4 times throughout day | Until recovery | Prevents dehydration, replaces electrolytes |
 
-Use these Indian medicine brands: Dolo 650, Crocin 500, Paracetamol, Combiflam, Sinarest, Vicks Action 500, Cetrizine, ORS powder, Zincovit tablets.
-Include 2-4 medicines with exact dosages, timing, and duration.
+---
 
-**WHEN TO SEE DOCTOR:**
-List specific warning signs and timeline (e.g., "if no improvement in 48 hours")
+🏥 **WHEN TO SEE DOCTOR:**
 
-**ADDITIONAL TIPS:**
-Diet recommendations, lifestyle changes, what to monitor
+• ⚠️ Fever persists beyond **3 days** or rises above **103°F**
 
-Make all headings and key medical terms BOLD. Be specific and medically accurate.""",
+• ⚠️ Severe headache, stiff neck, or **difficulty breathing**
+
+• ⚠️ **No improvement in 48 hours** despite medication
+
+---
+
+📋 **ADDITIONAL TIPS:**
+
+• 🍲 **Diet:** Light meals - khichdi, soup, fruits (oranges, bananas)
+
+• ❌ **Avoid:** Oily, spicy food, caffeine, alcohol
+
+• 📊 **Monitor:** Body temperature, fluid intake, energy levels
+
+---
+
+Now respond to the user's query in this EXACT format with emojis, spacing, and appropriate Indian medicines. Make key terms **BOLD**.""",
 
             "ocr_system": """You are a specialized medical document analyst. Analyze the extracted text and provide comprehensive medical interpretation.
 
