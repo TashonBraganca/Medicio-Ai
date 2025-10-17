@@ -279,18 +279,20 @@ USER REQUEST: {user_query if user_query else "Analyze this medical image for con
 
 USER REQUEST: {user_query if user_query else "Analyze this medical image for conditions and provide care guidance."}"""
             
-            # SPEED-OPTIMIZED: Prepare request for faster llava model response
+            # PREMIUM QUALITY: Prepare request for comprehensive llava vision analysis
             payload = {
                 "model": self.model,
-                "prompt": context_prompt,  # Use direct prompt without system prefix for speed
+                "prompt": context_prompt,  # Comprehensive medical vision prompt
                 "images": [base64_image],
                 "stream": False,
                 "options": {
-                    "temperature": 0.2,  # Lower for faster, more focused responses
-                    "num_predict": 250,   # Reduced token limit for speed
-                    "top_p": 0.9,        # Speed optimization
-                    "top_k": 50,         # Speed optimization
-                    "repeat_penalty": 1.1  # Prevent repetition for efficiency
+                    "temperature": config.VISION_TEMPERATURE,  # 0.2 - precise vision analysis
+                    "num_predict": 320,   # Concise vision analysis (20% reduction)
+                    "top_p": config.TOP_P,        # Good diversity
+                    "top_k": config.TOP_K,          # Balanced selection
+                    "repeat_penalty": config.REPEAT_PENALTY,  # Prevent repetition
+                    "num_ctx": config.NUM_CTX,      # Optimized context
+                    "num_thread": config.NUM_THREAD  # Balanced threading
                 }
             }
             
@@ -318,10 +320,12 @@ USER REQUEST: {user_query if user_query else "Analyze this medical image for con
             
                 for attempt in range(config.OLLAMA_RETRY_ATTEMPTS):
                     try:
+                        # Use extended timeout for comprehensive vision analysis
+                        vision_timeout = config.OLLAMA_VISION_TIMEOUT
                         response = requests.post(
                             f"{self.base_url}/api/generate",
                             json=payload,
-                            timeout=self.timeout
+                            timeout=vision_timeout
                         )
 
                         if response.status_code == 200:

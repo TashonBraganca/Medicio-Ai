@@ -158,18 +158,11 @@ class PersistentOllamaManager:
         return False
 
     def _preload_model(self, model_name: str) -> bool:
-        """Pre-load model into memory to eliminate first-request delay with MAXIMUM CPU USAGE"""
+        """Pre-load model into memory to eliminate first-request delay"""
         try:
-            import os
-            import psutil
+            logger.info(f"Pre-loading model '{model_name}'...")
 
-            # Detect maximum CPU threads available
-            cpu_count = psutil.cpu_count(logical=True) if hasattr(psutil, 'cpu_count') else os.cpu_count()
-            max_threads = cpu_count if cpu_count else 8
-
-            logger.info(f"🔥 Pre-loading model '{model_name}' with MAX CPU ({max_threads} threads)...")
-
-            # Make a dummy request to warm up the model with MAXIMUM PERFORMANCE
+            # Make a simple dummy request to warm up the model
             response = requests.post(
                 f"{config.OLLAMA_BASE_URL}/api/generate",
                 json={
@@ -178,14 +171,11 @@ class PersistentOllamaManager:
                     "stream": False,
                     "options": {
                         "num_predict": 5,  # Minimal tokens for fast warmup
-                        "num_thread": max_threads,  # USE ALL CPU THREADS
-                        "num_gpu": 99,  # Use all available GPU layers if GPU present
-                        "num_ctx": 2048,  # Context size
-                        "use_mmap": True,  # Memory-mapped files for faster loading
-                        "use_mlock": True  # Lock model in memory
+                        "num_thread": 4,  # Moderate threading
+                        "num_ctx": 512,  # Small context for preload
                     }
                 },
-                timeout=120  # Give model time to load with full resources
+                timeout=60  # Reasonable timeout
             )
 
             if response.status_code == 200:

@@ -360,19 +360,33 @@ class DocumentProcessor:
             user_prompt = f"""MEDICAL DOCUMENT TEXT:
 {extracted_text[:1000]}{'...' if len(extracted_text) > 1000 else ''}
 
-TASK: Quick analysis focusing on:
-1. Document type and key findings
-2. Critical values and their significance
-3. Immediate medical recommendations
+TASK: Detailed medical analysis with the following structure:
 
-Analyze the above medical text efficiently. 
+📋 DOCUMENT TYPE: [Type] Lab Report/Medical Record/etc.
 
-Provide a comprehensive medical interpretation following your system format:
-- Identify the document type based on the content
-- Extract all lab values, medications, and medical findings with their specific numbers/dosages
-- Interpret what these values mean clinically (compare to normal ranges where applicable) 
-- Provide specific medical recommendations based on the findings
-- Include relevant questions for the patient to ask their healthcare provider
+🔍 KEY MEDICAL FINDINGS:
+- Parameter: [Value] (Normal Range: [Range]) - [Status]
+[List all relevant parameters with their values, ranges, and status]
+
+📊 MEDICAL INTERPRETATION:
+1. [Main interpretation of findings]
+2. [Clinical significance]
+3. [Health implications]
+
+⚕️ RECOMMENDED ACTIONS:
+1. [Immediate steps if needed]
+2. [Follow-up requirements]
+3. [Lifestyle modifications if applicable]
+
+❓ QUESTIONS FOR HEALTHCARE PROVIDER:
+1. [Relevant question based on findings]
+2. [Follow-up specific question]
+3. [Treatment/management question]
+
+⚠️ IMPORTANT NOTES:
+- [Any critical values or urgent concerns]
+- [Special considerations]
+- [Monitoring requirements]
 
 Base your entire analysis on the actual content extracted from this document. Quote specific values and information from the text above."""
             
@@ -381,30 +395,31 @@ Base your entire analysis on the actual content extracted from this document. Qu
                 {"role": "user", "content": user_prompt}
             ]
             
-            # SPEED-OPTIMIZED: Ultra-fast document analysis configuration
+            # PREMIUM QUALITY: Use Gemma2:9B for comprehensive document analysis
             available_models = config.get_available_models()
 
-            # Use gemma2:2b for ultra-fast, high-quality medical analysis
+            # Use gemma2:9b for premium, detailed medical document analysis
             payload = {
-                "model": config.DEFAULT_LLM_MODEL,  # gemma2:2b - ultra-fast and accurate
+                "model": config.DEFAULT_LLM_MODEL,  # gemma2:9b - premium quality analysis
                 "messages": messages,
                 "stream": False,
                 "options": {
-                    "temperature": 0.1,      # Very focused for medical accuracy
-                    "num_predict": 400,      # Sufficient tokens for comprehensive analysis
-                    "top_p": 0.7,           # Focused responses
-                    "top_k": 20,            # Maximum speed optimization
-                    "repeat_penalty": 1.1,  # Prevent repetition
-                    "num_ctx": 1024,        # Minimal context for speed
+                    "temperature": config.OCR_TEMPERATURE,  # 0.2 - precise document analysis
+                    "num_predict": 400,      # Concise document analysis (20% reduction)
+                    "top_p": config.TOP_P,   # Good diversity
+                    "top_k": config.TOP_K,   # Balanced selection
+                    "repeat_penalty": config.REPEAT_PENALTY,  # Prevent repetition
+                    "num_ctx": config.NUM_CTX,  # Optimized context
+                    "num_thread": config.NUM_THREAD,  # Balanced threading
                     "seed": 42              # Consistency
                 }
             }
             
-            # Use ultra-fast model priority: gemma2:2b > qwen2:1.5b > fallback
-            fast_models = [config.DEFAULT_LLM_MODEL, config.FALLBACK_LLM_MODEL]
+            # Use premium model priority: gemma2:9b > gemma2:2b > qwen2:1.5b
+            premium_models = [config.DEFAULT_LLM_MODEL, config.FALLBACK_LLM_MODEL, config.FALLBACK_FAST_MODEL]
             last_error = None
 
-            for model_to_try in fast_models:
+            for model_to_try in premium_models:
                 # Check if model is available
                 try:
                     test_response = requests.get(f"{ollama_base_url}/api/tags", timeout=3)
@@ -424,8 +439,8 @@ Base your entire analysis on the actual content extracted from this document. Qu
                 
                 for attempt in range(config.OLLAMA_RETRY_ATTEMPTS):
                     try:
-                        # GEMMA2:2B optimized timeouts for document analysis
-                        timeout_duration = 50 if attempt == 0 else 60  # Document analysis needs more time
+                        # GEMMA2:9B optimized timeouts for detailed document analysis
+                        timeout_duration = config.OLLAMA_DOCUMENT_TIMEOUT  # Extended timeout for 9B model
                         
                         response = requests.post(
                             f"{ollama_base_url}/api/chat",

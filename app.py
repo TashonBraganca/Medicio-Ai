@@ -649,50 +649,64 @@ def process_user_message(user_message):
         return
 
     try:
-        # SIMPLE NON-STREAMING APPROACH - GUARANTEED TO WORK
-        with st.spinner("🤔 Thinking..."):
-            # Get complete response from Ollama
+        # Get response from Ollama
+        with st.spinner("🤔 Analyzing..."):
             response_data = chat_service.get_medical_response(user_message, st.session_state.chat_history[:-1])
 
-            if response_data["success"]:
-                ai_response = response_data["response"]
+            if response_data.get("success"):
+                ai_response = response_data.get("response", "")
+                
+                # Format the response
                 if isinstance(ai_response, dict):
-                    # Format structured response
                     formatted_response = format_medical_response(ai_response)
+                elif isinstance(ai_response, str):
+                    formatted_response = ai_response
                 else:
                     formatted_response = str(ai_response)
-
-                st.session_state.chat_history.append({"role": "assistant", "content": formatted_response})
+                
+                # Make sure we have actual content
+                if formatted_response and formatted_response.strip():
+                    st.session_state.chat_history.append({"role": "assistant", "content": formatted_response})
+                else:
+                    st.session_state.chat_history.append({"role": "assistant", "content": "❌ Empty response received. Please try rephrasing your question."})
             else:
-                error_response = f"❌ Error: {response_data.get('error', 'Unknown error occurred')}"
-                st.session_state.chat_history.append({"role": "assistant", "content": error_response})
+                error_msg = response_data.get('error', 'Unknown error occurred')
+                st.session_state.chat_history.append({"role": "assistant", "content": f"❌ Error: {error_msg}"})
 
     except Exception as e:
-        error_response = f"❌ Error processing query: {str(e)}"
-        st.session_state.chat_history.append({"role": "assistant", "content": error_response})
+        import traceback
+        error_details = traceback.format_exc()
+        print(f"Error in process_user_message: {error_details}")
+        st.session_state.chat_history.append({"role": "assistant", "content": f"❌ Error: {str(e)}"})
 
 def format_medical_response(response_dict):
-    """Format structured medical response for display - Enhanced prompt handles formatting."""
+    """Format structured medical response for display."""
     if not isinstance(response_dict, dict):
         return str(response_dict)
 
-    # Get the full response from summary (already formatted by enhanced prompt)
+    # Get the full response from summary (already formatted by prompt)
     summary = response_dict.get("summary", "")
-
-    if summary:
-        # The new prompt includes proper formatting with emojis, sections, and structure
-        # Just ensure clean line breaks and return
-        formatted_response = summary
-
+    
+    # If summary exists, return it directly
+    if summary and summary.strip():
         # Clean up excessive line breaks
+        formatted_response = summary
         formatted_response = formatted_response.replace("\n\n\n\n", "\n\n")
         formatted_response = formatted_response.replace("\n\n\n", "\n\n")
-        formatted_response = formatted_response.strip()
-
-        return formatted_response
-    else:
-        # Fallback if no summary available
-        return "Unable to generate medical response. Please try again."
+        return formatted_response.strip()
+    
+    # Fallback: try to get raw_response
+    raw_response = response_dict.get("raw_response", "")
+    if raw_response and raw_response.strip():
+        return raw_response.strip()
+    
+    # Last fallback: return any text we can find
+    for key in ["response", "content", "text", "message"]:
+        if key in response_dict and response_dict[key]:
+            return str(response_dict[key]).strip()
+    
+    # If nothing found, return error
+    return "❌ No response generated. Please try again with a different question."
 
 def render_chat_page():
     """Render the main chat page with auto-scroll functionality."""

@@ -249,19 +249,19 @@ class MedicalChatService:
             # Prepare messages for Ollama
             messages = self._prepare_messages(user_message, chat_history)
             
-            # MAXIMUM PERFORMANCE for gemma2:9b - Full resource utilization
+            # Optimized performance for laptop - balanced resource usage
             payload = {
                 "model": self.model,
                 "messages": messages,
                 "stream": True,
                 "options": {
-                    "temperature": config.CHAT_TEMPERATURE,  # 0.4 for natural, detailed responses
-                    "num_predict": config.DEFAULT_MAX_TOKENS,  # 800 for comprehensive medical guidance
-                    "top_k": config.TOP_K,  # 50 for richer language
-                    "top_p": config.TOP_P,  # 0.92 for nuanced, comprehensive answers
-                    "repeat_penalty": config.REPEAT_PENALTY,  # 1.15 prevent repetition
-                    "num_ctx": config.NUM_CTX,  # 4096 doubled context for superior reasoning
-                    "num_thread": config.NUM_THREAD  # 8 threads for maximum CPU utilization
+                    "temperature": config.CHAT_TEMPERATURE,
+                    "num_predict": config.DEFAULT_MAX_TOKENS,
+                    "top_k": config.TOP_K,
+                    "top_p": config.TOP_P,
+                    "repeat_penalty": config.REPEAT_PENALTY,
+                    "num_ctx": config.NUM_CTX,
+                    "num_thread": config.NUM_THREAD
                 }
             }
             
@@ -342,19 +342,19 @@ class MedicalChatService:
     def _call_ollama(self, messages: List[Dict]) -> Dict[str, Any]:
         """Universal cross-platform Ollama API call with robust error handling."""
 
-        # MAXIMUM PERFORMANCE for gemma2:9b - Full resource utilization
+        # Optimized performance for laptop - balanced resource usage
         payload = {
             "model": self.model,
             "messages": messages,
             "stream": False,
             "options": {
-                "temperature": config.CHAT_TEMPERATURE,  # 0.4 for natural, detailed responses
-                "num_predict": config.DEFAULT_MAX_TOKENS,  # 800 for comprehensive medical guidance
-                "top_k": config.TOP_K,  # 50 for richer language
-                "top_p": config.TOP_P,  # 0.92 for nuanced, comprehensive answers
-                "repeat_penalty": config.REPEAT_PENALTY,  # 1.15 prevent repetition
-                "num_ctx": config.NUM_CTX,  # 4096 doubled context for superior reasoning
-                "num_thread": config.NUM_THREAD,  # 8 threads for maximum CPU utilization
+                "temperature": config.CHAT_TEMPERATURE,
+                "num_predict": config.DEFAULT_MAX_TOKENS,
+                "top_k": config.TOP_K,
+                "top_p": config.TOP_P,
+                "repeat_penalty": config.REPEAT_PENALTY,
+                "num_ctx": config.NUM_CTX,
+                "num_thread": config.NUM_THREAD,
                 "seed": 42
             }
         }
