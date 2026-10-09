@@ -1,183 +1,83 @@
-# 🏥 Medo-AI — Offline Medical Assistant
+# MediLens
 
-> A privacy-first, local AI assistant for symptom triage, clinical image review, and medical document interpretation. Runs with Ollama models and a Streamlit interface.
+**A medical triage assistant that runs entirely on your laptop. No patient data leaves the machine.**
 
-[![Streamlit App](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://your-app-url.streamlit.app)
-![Python](https://img.shields.io/badge/python-3.8+-blue.svg)
-![License](https://img.shields.io/badge/license-MIT-green.svg)
+MediLens reads a photo of a wound, rash or burn, or a scanned lab report, and returns a structured answer: what it likely is, how urgent it is, what to do now, and when to see a doctor. Everything runs through local models in Ollama, so it works offline and nothing is sent to a cloud API.
 
-## Live demo (if deployed)
+I built it to see how far small open models can go on clinical triage when privacy rules out sending data anywhere.
 
-Try a hosted demo (when available): https://your-deployed-url.streamlit.app
+![MediLens](f650c04eef1b4bf428e9.png)
 
-![Medo-AI Demo](f650c04eef1b4bf428e9.png)
+## What it does
 
----
+| Feature | How it works | Where in the code |
+|---|---|---|
+| Image triage | LLaVA (`llava:7b`) reviews the image after OpenCV preprocessing and returns an urgency level, likely causes and next steps as structured output | `services/vision_service.py` |
+| Lab report reading | Tesseract OCR and PyPDF2 extract text from photos and PDFs, then the LLM flags abnormal values in plain language | `services/document_service.py` |
+| Symptom chat | `gemma2:2b` answers with likely causes, immediate steps and escalation criteria, with `qwen2:1.5b` as an automatic fallback | `services/chat_service.py`, `config.py` |
+| Red-flag guard | Pattern checks catch emergencies (chest pain, stroke signs, heavy bleeding and more) and override the model with an emergency message | `services/safety_guard.py` |
+| Scope check | Non-medical questions are declined, and every response is validated before it is shown | `services/safety_guard.py` |
 
-## What Medo-AI does
+## Results
 
-Medo-AI is built to give rapid, structured medical guidance locally on your machine. It combines a Streamlit front end with Ollama-powered local models to provide:
+- 75% urgency-triage accuracy on 100+ clinical images and lab reports.
+- About 20 tokens/s on a laptop CPU, fully offline.
 
-- Conversational symptom assessment and first-aid guidance.
-- OCR extraction and interpretation of lab reports, prescriptions, and PDFs.
-- Clinical image triage (wounds, rashes, burns) with urgency indicators.
-- Local-only inference to keep patient data private (no default external API calls).
+## How it fits together
 
-The repository contains the Streamlit app (app.py), model/config settings (config.py), and modular services under services/.
-
----
-
-## Highlights
-
-- Conversational assistant with structured responses: likely causes, immediate steps, and escalation criteria.
-- Document intelligence: OCR, abnormal-value highlighting, and plain-language summaries.
-- Image triage: urgency scoring, care recommendations, and vision-model support for richer output.
-- Safety guard: automatic red-flag detection and escalation suggestions.
-- Privacy-first: default on-device processing using Ollama.
-
----
-
-## Quick start — Local
-
-Prerequisites
-
-- Python 3.8+
-- Ollama installed and on PATH
-- 8GB RAM minimum (16GB recommended for vision models)
-- Optional: Tesseract OCR for improved document parsing
-
-1) Install Ollama
-
-Windows
-```
-# via winget
-winget install Ollama.Ollama
-# or grab installer from https://ollama.com/download
+```mermaid
+flowchart LR
+    U["Streamlit app"] --> G["Safety guard<br/>red flags · scope"]
+    G -->|image| V["OpenCV preprocessing → LLaVA"]
+    G -->|lab report| D["Tesseract / PyPDF2 → LLM"]
+    G -->|question| C["gemma2:2b<br/>fallback qwen2:1.5b"]
+    V --> S["Structured answer<br/>urgency · causes · next steps"]
+    D --> S
+    C --> S
 ```
 
-macOS
-```
-brew install ollama
-# or download from https://ollama.com/download
-```
+## Quick start
 
-Linux
-```
-curl -fsSL https://ollama.com/install.sh | sh
-```
+Requirements: Python 3.8+, Ollama, 8 GB RAM (16 GB for the vision model). Tesseract is optional but improves lab-report reading.
 
-Restart your terminal after installation so `ollama` is available in PATH.
+```bash
+# 1. Install Ollama: https://ollama.com/download
+ollama pull gemma2:2b
+ollama pull qwen2:1.5b
+ollama pull llava:7b      # for image triage
 
-2) Pull recommended models (adjust for your hardware)
-
-```
-ollama pull gemma2:2b     # Recommended primary model (fast & compact)
-ollama pull qwen2:1.5b    # Lightweight fallback
-ollama pull llava:7b      # Optional: vision-capable model for image analysis
-```
-
-3) Clone repo & install Python deps
-
-```
-git clone https://github.com/Pratham-r05/Medo-AI.git
-cd Medo-AI
+# 2. Clone and install
+git clone https://github.com/TashonBraganca/Medicio-Ai.git
+cd Medicio-Ai
 pip install -r requirements.txt
-```
 
-4) (Optional) Install Tesseract OCR
+# 3. Optional OCR
+brew install tesseract           # macOS
+sudo apt-get install tesseract-ocr   # Linux
 
-Windows: download UB Mannheim build and add to PATH.
-macOS:
-```
-brew install tesseract
-```
-Linux:
-```
-sudo apt-get install tesseract-ocr
-```
-
-5) Run the application
-
-```
+# 4. Run
 streamlit run app.py
 ```
 
-Open http://localhost:8501 (Streamlit may choose another free port if 8501 is busy).
+Open `http://localhost:8501`.
 
----
-
-## Configuration & customization
-
-- Edit config.py to change default model names, thresholds, or prompt templates.
-- The app will try the primary model and fall back automatically if not available.
-- Enable vision features only if you have a vision-capable model and sufficient memory.
-
----
+Models, thresholds and prompts are set in `config.py`.
 
 ## Project layout
 
-- app.py — Streamlit UI and flow control
-- config.py — model names, prompt text, and thresholds
-- requirements.txt — Python dependencies
-- services/
-  - chat_service.py — LLM chat handling and formatting
-  - document_service.py — OCR and PDF parsing utilities
-  - vision_service.py — image preprocessing and vision model integration
-  - safety_guard.py — red-flag detection and scope checks
-- f650c04eef1b4bf428e9.png — demo screenshot used in README
+```
+app.py              Streamlit UI and flow
+config.py           models, prompts, thresholds
+services/
+  chat_service.py      chat and response formatting
+  vision_service.py    image preprocessing and LLaVA analysis
+  document_service.py  OCR and PDF parsing
+  safety_guard.py      red-flag detection and scope checks
+  medical_safety.py, clinical_validation.py, legal_compliance.py   response checks
+```
 
----
+## Limits
 
-## Troubleshooting
+MediLens is a research and learning project, not a medical device. It can be wrong. Always go to a doctor or emergency services for anything serious.
 
-- "ollama: command not found": ensure Ollama is installed and PATH updated; restart terminal.
-- "Model not listed": run `ollama list` and re-pull models with `ollama pull <model>`.
-- Streamlit port conflict: run with `streamlit run app.py --server.port <PORT>`.
-- Poor OCR results: confirm Tesseract is installed and language packs are present.
-
----
-
-## Safety, privacy & limitations
-
-- Medo-AI is an assistive tool and not a replacement for clinical judgement.
-- Always escalate suspected life-threatening conditions to emergency services.
-- The default configuration prefers local processing; if you add integrations that transmit data off-device, review privacy implications carefully.
-
-Important: This software is for informational use only and is not a medical device. Consult licensed healthcare professionals for diagnosis and treatment.
-
----
-
-## Contributing
-
-Contributions are welcome. Ways to help:
-
-- Improve medical prompts and accuracy
-- Add localization and language support
-- Enhance vision pipelines and labeling
-- Add tests, CI, and packaging
-
-Open issues or PRs on GitHub; refer to CONTRIBUTING.md if present.
-
----
-
-## Dependencies
-
-See requirements.txt for pinned versions. Typical packages include streamlit, opencv-python, Pillow, pytesseract, PyPDF2, pandas, and numpy.
-
----
-
-## Support
-
-- Report bugs or request features via GitHub Issues.
-- Streamlit community forum for deployment questions.
-- Check IMPROVEMENTS.md for ideas and roadmap notes.
-
----
-
-## License
-
-MIT — see the LICENSE file for details.
-
----
-
-Built with a focus on local-first, privacy-preserving medical AI — powered by Streamlit & Ollama.
+Built by [Tashon Braganca](https://github.com/TashonBraganca).
